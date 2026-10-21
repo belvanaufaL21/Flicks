@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
 import { easeOut, fadeUp, Stagger } from "@/components/motion/reveal";
+import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
 const faqs = [
@@ -59,7 +60,7 @@ export function Faq() {
               >
                 <span className="font-display text-xl text-ink sm:text-2xl">{f.q}</span>
                 <motion.span
-                  animate={{ rotate: isOpen ? 45 : 0, backgroundColor: isOpen ? "#5a2941" : "#fffcf7" }}
+                  animate={{ rotate: isOpen ? 45 : 0, backgroundColor: isOpen ? brand.accent : brand.paper }}
                   transition={{ duration: 0.3, ease: easeOut }}
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line ${
                     isOpen ? "text-paper" : "text-ink"

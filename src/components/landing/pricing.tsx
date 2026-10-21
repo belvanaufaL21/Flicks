@@ -22,7 +22,7 @@ export function Pricing() {
             eyebrow="Harga"
             title={
               <>
-                Satu harga, <em className="text-plum">tanpa kejutan</em>.
+                Satu harga, <em className="text-accent">tanpa kejutan</em>.
               </>
             }
             description="Rincian paket ditampilkan jelas sebelum kamu membayar. Tidak ada langganan, tidak ada biaya tersembunyi."
@@ -50,7 +50,7 @@ export function Pricing() {
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 14, ease: "linear", repeat: Infinity }}
-              className="absolute -inset-[60%] bg-[conic-gradient(from_0deg,#5a2941,#d9908a,#e8c8a0,#8da38a,#5a2941)]"
+              className="absolute -inset-[60%] bg-[conic-gradient(from_0deg,var(--color-accent-deep),var(--color-accent),var(--color-line),var(--color-cream),var(--color-accent),var(--color-accent-deep))]"
             />
             <div className="relative rounded-[33px] bg-paper p-8 sm:p-10">
               <div className="flex items-start justify-between">
@@ -58,7 +58,7 @@ export function Pricing() {
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted">Paket</p>
                   <p className="mt-1 font-display text-3xl text-ink">1 Token FLICKS</p>
                 </div>
-                <span className="rounded-full bg-plum-soft px-3 py-1 text-xs font-medium text-plum">
+                <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent-deep">
                   Harga soft launch
                 </span>
               </div>
@@ -77,7 +77,7 @@ export function Pricing() {
                     transition={{ delay: 0.15 + i * 0.08, ease: easeOut, duration: 0.6 }}
                     className="flex gap-3"
                   >
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-plum text-paper">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-deep text-paper">
                       <Check size={14} />
                     </span>
                     <span>
@@ -90,7 +90,7 @@ export function Pricing() {
 
               <a
                 href="/analyze"
-                className="group mt-10 flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-plum"
+                className="group mt-10 flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
               >
                 Beli token & mulai
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />

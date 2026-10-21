@@ -36,7 +36,7 @@ export function Problems() {
           eyebrow="Dari ragu jadi yakin"
           title={
             <>
-              Ubah pertanyaan sehari-hari jadi <em className="text-plum">panduan gaya</em>.
+              Ubah pertanyaan sehari-hari jadi <em className="text-accent">panduan gaya</em>.
             </>
           }
           description="FLICKS Lite dirancang untuk kamu yang ingin mengenal warna dan siluet diri sendiri, dengan konteks yang relevan untuk pengguna Indonesia."
@@ -50,11 +50,11 @@ export function Problems() {
               transition={{ type: "spring", stiffness: 300, damping: 24 }}
               className="group relative overflow-hidden rounded-3xl border border-line bg-cream/60 p-8"
             >
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-rose/0 blur-2xl transition-colors duration-500 group-hover:bg-rose/30" />
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-paper text-plum shadow-sm">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-accent/0 blur-2xl transition-colors duration-500 group-hover:bg-accent/25" />
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-paper text-accent-deep shadow-sm">
                 <Icon size={22} />
               </span>
-              <p className="mt-6 text-sm text-muted line-through decoration-rose/60">{problem}</p>
+              <p className="mt-6 text-sm text-muted line-through decoration-accent/60">{problem}</p>
               <p className="mt-3 font-display text-2xl leading-snug text-ink">{answer}</p>
             </motion.article>
           ))}

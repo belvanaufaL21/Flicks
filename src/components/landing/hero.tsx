@@ -26,11 +26,11 @@ export function Hero() {
     <section ref={ref} className="relative overflow-hidden pt-32 pb-24 sm:pt-40 lg:pb-32">
       <motion.div
         style={{ scale: blobScale }}
-        className="pointer-events-none absolute -top-40 right-[-20%] h-[640px] w-[640px] rounded-full bg-gradient-to-br from-rose/40 via-sand/40 to-transparent blur-3xl"
+        className="pointer-events-none absolute -top-40 right-[-20%] h-[640px] w-[640px] rounded-full bg-gradient-to-br from-accent/25 via-line/60 to-transparent blur-3xl"
       />
       <motion.div
         style={{ scale: blobScale }}
-        className="pointer-events-none absolute bottom-[-30%] left-[-15%] h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-sage/30 via-plum-soft/50 to-transparent blur-3xl"
+        className="pointer-events-none absolute bottom-[-30%] left-[-15%] h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-line/70 via-accent-soft/60 to-transparent blur-3xl"
       />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
@@ -41,7 +41,7 @@ export function Hero() {
             transition={{ duration: 0.7, ease: easeOut }}
             className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-4 py-1.5 text-xs font-medium text-muted backdrop-blur"
           >
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-clay" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
             AI Personal Styling · Soft launch
           </motion.p>
 
@@ -63,7 +63,7 @@ export function Hero() {
                 initial={{ y: "110%" }}
                 animate={{ y: "0%" }}
                 transition={{ duration: 0.9, ease: easeOut, delay: 0.15 + headline.length * 0.07 }}
-                className="inline-block italic text-plum"
+                className="inline-block italic text-accent"
               >
                 kamu.
               </motion.span>
@@ -89,7 +89,7 @@ export function Hero() {
           >
             <a
               href="#harga"
-              className="group inline-flex items-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-plum"
+              className="group inline-flex items-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
             >
               Mulai Analisis
               <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
@@ -121,7 +121,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 60, rotate: 6 }}
               animate={{ opacity: 1, y: 0, rotate: 0 }}
               transition={{ duration: 1.2, ease: easeOut, delay: 0.3 }}
-              className="relative mx-auto h-[540px] w-[270px] rounded-[46px] bg-ink p-3 shadow-[0_40px_80px_-30px_rgba(30,25,21,0.6)]"
+              className="relative mx-auto h-[540px] w-[270px] rounded-[46px] bg-ink p-3 shadow-[0_40px_80px_-30px_rgba(37,34,31,0.6)]"
             >
               <div className="absolute left-1/2 top-5 z-20 h-5 w-20 -translate-x-1/2 rounded-full bg-ink" />
               <div className="relative h-full w-full overflow-hidden rounded-[36px] bg-[#e3cfb3]">
@@ -144,18 +144,18 @@ export function Hero() {
                   "left-5 bottom-16 border-b-2 border-l-2",
                   "right-5 bottom-16 border-b-2 border-r-2",
                 ].map((pos) => (
-                  <span key={pos} className={`absolute h-6 w-6 rounded-sm border-plum/70 ${pos}`} />
+                  <span key={pos} className={`absolute h-6 w-6 rounded-sm border-accent/70 ${pos}`} />
                 ))}
 
                 {/* scan line */}
                 <motion.div
                   animate={{ top: ["14%", "80%", "14%"] }}
                   transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
-                  className="absolute inset-x-5 h-0.5 rounded-full bg-plum shadow-[0_0_24px_6px_rgba(90,41,65,0.35)]"
+                  className="absolute inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
                 />
 
                 <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-paper/90 px-3 py-2.5 text-xs text-ink backdrop-blur">
-                  <ScanLine size={14} className="text-plum" />
+                  <ScanLine size={14} className="text-accent-deep" />
                   <span className="font-medium">Menganalisis foto</span>
                   <span className="ml-auto flex gap-1">
                     {[0, 1, 2].map((d) => (
@@ -163,7 +163,7 @@ export function Hero() {
                         key={d}
                         animate={{ opacity: [0.2, 1, 0.2] }}
                         transition={{ duration: 1.2, repeat: Infinity, delay: d * 0.2 }}
-                        className="h-1.5 w-1.5 rounded-full bg-plum"
+                        className="h-1.5 w-1.5 rounded-full bg-accent"
                       />
                     ))}
                   </span>
@@ -200,7 +200,7 @@ export function Hero() {
           <motion.div style={{ y: cardFastY }} className="absolute bottom-28 left-0 sm:-left-12">
             <FloatCard delay={1.5} float={8}>
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-sage" />
+                <span className="h-2 w-2 rounded-full bg-accent" />
                 <p className="text-xs font-medium text-ink">Virtual try-on siap</p>
               </div>
             </FloatCard>
@@ -229,7 +229,7 @@ function FloatCard({
       <motion.div
         animate={{ y: [0, float, 0] }}
         transition={{ duration: 5, ease: "easeInOut", repeat: Infinity }}
-        className="rounded-2xl border border-line/70 bg-paper/85 px-4 py-3 shadow-[0_20px_40px_-20px_rgba(30,25,21,0.35)] backdrop-blur-md"
+        className="rounded-2xl border border-line/70 bg-paper/85 px-4 py-3 shadow-[0_20px_40px_-20px_rgba(37,34,31,0.35)] backdrop-blur-md"
       >
         {children}
       </motion.div>

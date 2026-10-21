@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { motion, useMotionValueEvent, useScroll, useSpring } from "motion/react";
 import { Camera, FileText, QrCode, Shirt, Sparkles } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
+import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
 const steps = [
@@ -53,7 +54,7 @@ export function HowItWorks() {
             eyebrow="Cara kerja"
             title={
               <>
-                Lima langkah, <em className="text-plum">satu laporan</em>.
+                Lima langkah, <em className="text-accent">satu laporan</em>.
               </>
             }
             description="Tanpa aplikasi, tanpa akun. Semua berjalan di browser HP atau laptopmu."
@@ -64,7 +65,7 @@ export function HowItWorks() {
                 key={s.title}
                 animate={{
                   width: i === active ? 40 : 10,
-                  backgroundColor: i <= active ? "#5a2941" : "#e7dccf",
+                  backgroundColor: i <= active ? brand.accent : brand.line,
                 }}
                 transition={{ duration: 0.4, ease: easeOut }}
                 className="h-2.5 rounded-full"
@@ -80,7 +81,7 @@ export function HowItWorks() {
           <span className="absolute left-[15px] top-2 bottom-2 w-px bg-line sm:left-[23px]" />
           <motion.span
             style={{ scaleY: progress }}
-            className="absolute left-[15px] top-2 bottom-2 w-px origin-top bg-plum sm:left-[23px]"
+            className="absolute left-[15px] top-2 bottom-2 w-px origin-top bg-accent sm:left-[23px]"
           />
           {steps.map(({ icon: Icon, title, body }, i) => {
             const isActive = i === active;
@@ -96,8 +97,8 @@ export function HowItWorks() {
                 <motion.span
                   animate={{
                     scale: isActive ? 1.15 : 1,
-                    backgroundColor: i <= active ? "#5a2941" : "#fffcf7",
-                    color: i <= active ? "#fffcf7" : "#6f625a",
+                    backgroundColor: i <= active ? brand.accent : brand.paper,
+                    color: i <= active ? brand.paper : brand.muted,
                   }}
                   transition={{ duration: 0.4, ease: easeOut }}
                   className="absolute -left-10 top-7 flex h-8 w-8 items-center justify-center rounded-full border border-line text-xs font-semibold sm:-left-14 sm:h-12 sm:w-12"
@@ -107,12 +108,12 @@ export function HowItWorks() {
                 <motion.div
                   animate={{
                     opacity: isActive ? 1 : 0.55,
-                    borderColor: isActive ? "rgba(90,41,65,0.25)" : "rgba(231,220,207,1)",
+                    borderColor: isActive ? "rgba(154,128,96,0.4)" : brand.line,
                   }}
                   transition={{ duration: 0.4 }}
-                  className="rounded-3xl border bg-paper p-7 shadow-[0_20px_50px_-30px_rgba(30,25,21,0.3)]"
+                  className="rounded-3xl border bg-paper p-7 shadow-[0_20px_50px_-30px_rgba(37,34,31,0.3)]"
                 >
-                  <p className="font-display text-sm text-rose">Langkah 0{i + 1}</p>
+                  <p className="font-display text-sm text-accent-deep">Langkah 0{i + 1}</p>
                   <h3 className="mt-1 font-display text-3xl text-ink">{title}</h3>
                   <p className="mt-3 leading-relaxed text-muted">{body}</p>
                 </motion.div>

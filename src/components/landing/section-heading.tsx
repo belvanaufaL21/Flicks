@@ -23,7 +23,7 @@ export function SectionHeading({
       <Reveal>
         <p
           className={`text-xs font-semibold uppercase tracking-[0.22em] ${
-            dark ? "text-rose" : "text-plum"
+            dark ? "text-accent-light" : "text-accent-deep"
           }`}
         >
           {eyebrow}

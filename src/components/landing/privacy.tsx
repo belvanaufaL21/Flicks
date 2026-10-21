@@ -38,7 +38,7 @@ export function Privacy() {
     <section id="privasi" ref={ref} className="relative overflow-hidden bg-ink py-24 lg:py-32">
       <motion.div
         style={{ x: glowX }}
-        className="pointer-events-none absolute -top-40 left-0 h-[500px] w-[700px] rounded-full bg-plum/50 blur-[120px]"
+        className="pointer-events-none absolute -top-40 left-0 h-[500px] w-[700px] rounded-full bg-accent/25 blur-[120px]"
       />
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
@@ -46,7 +46,7 @@ export function Privacy() {
           eyebrow="Privasi & transparansi"
           title={
             <>
-              Fotomu tetap <em className="text-rose">milikmu</em>.
+              Fotomu tetap <em className="text-accent-light">milikmu</em>.
             </>
           }
           description="Kami hanya memakai foto untuk membuat laporanmu, dan menjelaskan ke mana foto itu dikirim sebelum kamu mengunggahnya."
@@ -58,7 +58,7 @@ export function Privacy() {
               variants={fadeUp}
               className="rounded-3xl border border-paper/10 bg-paper/5 p-7 backdrop-blur"
             >
-              <Icon className="text-rose" size={24} />
+              <Icon className="text-accent-light" size={24} />
               <h3 className="mt-5 font-display text-2xl text-paper">{title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-paper/65">{body}</p>
             </motion.div>

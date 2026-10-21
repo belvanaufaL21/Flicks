@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
+/* Brand system. Keep in sync with src/lib/brand.ts (used by JS animations). */
 @theme {
-  --color-cream: #f6f0e8;
-  --color-paper: #fffcf7;
-  --color-ink: #1e1915;
-  --color-muted: #6f625a;
-  --color-line: #e7dccf;
-  --color-plum: #5a2941;
-  --color-plum-soft: #efe2e7;
-  --color-rose: #d9908a;
-  --color-sage: #8da38a;
-  --color-sand: #e8c8a0;
-  --color-clay: #c0653f;
+  --color-cream: #f2eee6; /* Background utama */
+  --color-ink: #25221f; /* Teks dan navigasi */
+  --color-accent: #9a8060; /* Aksen premium */
+  --color-line: #d4c9b8; /* Garis dan permukaan sekunder */
+
+  /* Derived shades */
+  --color-paper: #faf8f4; /* Card surfaces */
+  --color-muted: #6b645b; /* Secondary text */
+  --color-accent-deep: #6f5b40; /* Accent for small text on light backgrounds */
+  --color-accent-light: #c9b38f; /* Accent on dark backgrounds */
+  --color-accent-soft: #e6dccb; /* Accent tint for chips and fills */
 }
 
 @theme inline {

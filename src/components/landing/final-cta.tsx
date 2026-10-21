@@ -4,13 +4,14 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/motion/reveal";
+import { brand } from "@/lib/brand";
 import { Logo } from "./navbar";
 
 const orbs = [
-  { color: "#d9908a", size: 220, x: "8%", y: "18%", speed: -120 },
-  { color: "#e8c8a0", size: 160, x: "78%", y: "10%", speed: 90 },
-  { color: "#8da38a", size: 120, x: "70%", y: "65%", speed: -60 },
-  { color: "#c0653f", size: 90, x: "20%", y: "72%", speed: 140 },
+  { color: brand.accent, size: 220, x: "8%", y: "18%", speed: -120 },
+  { color: brand.line, size: 160, x: "78%", y: "10%", speed: 90 },
+  { color: brand.accentDeep, size: 120, x: "70%", y: "65%", speed: -60 },
+  { color: brand.accentLight, size: 90, x: "20%", y: "72%", speed: 140 },
 ];
 
 export function FinalCta() {
@@ -22,7 +23,7 @@ export function FinalCta() {
     <section ref={ref} className="px-4 pb-10 sm:px-6">
       <motion.div
         style={{ scale }}
-        className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] bg-plum px-6 py-24 text-center sm:py-32"
+        className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] bg-ink px-6 py-24 text-center sm:py-32"
       >
         {orbs.map((o) => (
           <Orb key={o.color} {...o} progress={scrollYProgress} />
@@ -30,7 +31,7 @@ export function FinalCta() {
         <div className="relative">
           <Reveal>
             <h2 className="mx-auto max-w-3xl font-display text-5xl leading-[1.05] text-paper sm:text-6xl lg:text-7xl">
-              Siap kenalan dengan <em className="text-sand">palet warnamu</em>?
+              Siap kenalan dengan <em className="text-accent-light">palet warnamu</em>?
             </h2>
           </Reveal>
           <Reveal delay={0.12}>
@@ -41,7 +42,7 @@ export function FinalCta() {
           <Reveal delay={0.24}>
             <a
               href="#harga"
-              className="group mt-10 inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-sand"
+              className="group mt-10 inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-accent-soft"
             >
               Mulai Analisis
               <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />

@@ -12,6 +12,7 @@ import {
 import Image from "next/image";
 import { Clock, Info, Lock } from "lucide-react";
 import { easeOut, Reveal } from "@/components/motion/reveal";
+import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
 const tabs = [
@@ -33,7 +34,7 @@ export function ReportPreview() {
           eyebrow="Contoh hasil"
           title={
             <>
-              Ruang ganti pribadi, <em className="text-plum">di genggaman</em>.
+              Ruang ganti pribadi, <em className="text-accent">di genggaman</em>.
             </>
           }
           description="Begini gambaran laporan yang kamu terima. Setiap bagian menyertakan tingkat keyakinan dan catatan kualitas foto."
@@ -69,7 +70,7 @@ export function ReportPreview() {
         </Reveal>
 
         <Reveal delay={0.2} y={50} className="mx-auto mt-8 max-w-4xl">
-          <div className="overflow-hidden rounded-[32px] border border-line bg-cream/70 shadow-[0_40px_80px_-40px_rgba(30,25,21,0.35)]">
+          <div className="overflow-hidden rounded-[32px] border border-line bg-cream/70 shadow-[0_40px_80px_-40px_rgba(37,34,31,0.35)]">
             <div className="flex items-center justify-between gap-4 border-b border-line bg-paper/80 px-6 py-4">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <Lock size={14} />
@@ -113,7 +114,7 @@ function Countdown() {
   }, []);
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-plum-soft px-3 py-1 text-xs font-medium text-plum">
+    <span className="flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent-deep">
       <Clock size={12} />
       Kedaluwarsa {pad(Math.floor(secs / 3600))}:{pad(Math.floor((secs % 3600) / 60))}:
       {pad(secs % 60)}
@@ -146,7 +147,7 @@ function Swatches({ colors, size = "h-14 w-14" }: { colors: string[]; size?: str
 function ColorPanel() {
   return (
     <div className="grid gap-10 md:grid-cols-[0.9fr_1.1fr]">
-      <div className="rounded-3xl bg-gradient-to-br from-sand via-rose/60 to-clay/70 p-7 text-ink">
+      <div className="rounded-3xl bg-gradient-to-br from-accent-soft via-line to-accent/70 p-7 text-ink">
         <p className="text-xs font-semibold uppercase tracking-widest text-ink/60">Estimasi season</p>
         <p className="mt-3 font-display text-5xl">Soft Autumn</p>
         <div className="mt-6 space-y-2 text-sm">
@@ -232,7 +233,7 @@ function BodyPanel() {
               <motion.span
                 layoutId="shape-highlight"
                 transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                className="absolute inset-0 rounded-2xl border border-plum/30 bg-paper shadow-sm"
+                className="absolute inset-0 rounded-2xl border border-accent/40 bg-paper shadow-sm"
               />
             )}
             <span className="relative block">
@@ -242,12 +243,12 @@ function BodyPanel() {
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
                   transition={{ duration: 1.2, ease: easeOut }}
-                  fill={selected === s.id ? "#efe2e7" : "transparent"}
-                  stroke={selected === s.id ? "#5a2941" : "#b8aaa0"}
+                  fill={selected === s.id ? brand.accentSoft : "transparent"}
+                  stroke={selected === s.id ? brand.accent : "#bfb3a2"}
                   strokeWidth="2"
                 />
               </svg>
-              <span className={`mt-2 block text-center text-sm font-medium ${selected === s.id ? "text-plum" : "text-muted"}`}>
+              <span className={`mt-2 block text-center text-sm font-medium ${selected === s.id ? "text-accent-deep" : "text-muted"}`}>
                 {s.name}
               </span>
             </span>
@@ -273,7 +274,7 @@ function BodyPanel() {
           <ul className="space-y-3">
             {shape.tips.map((t) => (
               <li key={t} className="flex gap-3 text-ink">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-clay" />
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                 {t}
               </li>
             ))}
@@ -319,7 +320,7 @@ function TryOnPanel() {
         }}
         onPointerMove={(e) => dragging && moveTo(e.clientX)}
         onPointerUp={() => setDragging(false)}
-        className="relative mx-auto aspect-[768/1376] w-full max-w-[340px] cursor-ew-resize touch-none select-none overflow-hidden rounded-3xl bg-sand"
+        className="relative mx-auto aspect-[768/1376] w-full max-w-[340px] cursor-ew-resize touch-none select-none overflow-hidden rounded-3xl bg-line"
       >
         <Image
           src="/images/model-before.webp"
@@ -357,7 +358,7 @@ function TryOnPanel() {
               if (e.key === "ArrowLeft") pos.set(Math.max(5, pos.get() - 5));
               if (e.key === "ArrowRight") pos.set(Math.min(95, pos.get() + 5));
             }}
-            className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-paper text-sm text-ink shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-plum"
+            className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-paper text-sm text-ink shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             ⇆
           </span>
@@ -403,9 +404,9 @@ function MetaPanel() {
           </motion.div>
         ))}
       </dl>
-      <div className="rounded-3xl border border-rose/40 bg-rose/10 p-7">
+      <div className="rounded-3xl border border-accent/40 bg-accent-soft/50 p-7">
         <p className="flex items-center gap-2 font-display text-2xl text-ink">
-          <Info size={20} className="text-clay" /> Tentang hasil ini
+          <Info size={20} className="text-accent-deep" /> Tentang hasil ini
         </p>
         <p className="mt-3 leading-relaxed text-muted">
           Seluruh hasil adalah <strong className="text-ink">estimasi dan saran gaya</strong>, bukan

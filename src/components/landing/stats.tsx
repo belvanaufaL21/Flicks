@@ -47,7 +47,7 @@ export function Stats() {
         eyebrow="Satu token, tiga jawaban"
         title={
           <>
-            Konsultasi gaya, <em className="text-plum">versi saku</em>.
+            Konsultasi gaya, <em className="text-accent">versi saku</em>.
           </>
         }
         description="Satu kali beli langsung memberimu gambaran warna, siluet, dan simulasi outfit — tanpa perlu janji temu atau komitmen bulanan."
