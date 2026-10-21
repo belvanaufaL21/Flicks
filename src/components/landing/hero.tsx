@@ -7,7 +7,16 @@ import { ArrowRight, ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import { Magnetic } from "@/components/motion/shapes";
 
-const headline = ["Temukan", "warna", "&", "siluet", "yang", "paling"];
+const headline = [
+  { text: "Kenali warnamu." },
+  { text: "Pahami siluetmu." },
+  { text: "Coba sebelum beli.", accent: true },
+];
+const facts = [
+  ["Rp19rb", "sekali bayar"],
+  ["72 jam", "laporan privat"],
+  ["QRIS", "tanpa akun"],
+];
 // Top of the Deep Autumn palette measured for the sample model (see report-preview.tsx).
 const palette = ["#9c4a2f", "#6b6b2e", "#4e3426", "#1f5a5a", "#6e2a2f"];
 
@@ -58,85 +67,97 @@ export function Hero() {
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
         <motion.div style={{ y: textY, opacity: textOpacity }}>
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: easeOut }}
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/80 px-4 py-1.5 text-xs font-medium text-muted"
+          {/* Issue-style masthead line instead of a pill badge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8 }}
+            className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted"
           >
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-            AI Personal Styling · Soft launch
-          </motion.p>
+            <motion.span
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 0.9, ease: easeOut }}
+              className="h-px w-10 origin-left bg-ink/50"
+            />
+            <span className="hidden sm:inline">Personal styling · </span>Edisi soft launch
+          </motion.div>
 
-          <h1 className="mt-6 font-display text-5xl leading-[1.02] tracking-tight text-ink sm:text-6xl lg:text-7xl">
-            {headline.map((word, i) => (
-              <span key={i} className="inline-block overflow-hidden pb-1 align-bottom">
+          {/* One line per thing the report gives you, numbered like an index */}
+          <h1 className="mt-8 font-display text-[2.85rem] leading-[1.02] tracking-tight text-ink sm:text-6xl lg:text-[4.1rem] xl:text-7xl">
+            {headline.map((line, i) => (
+              <span key={line.text} className="flex items-start gap-4 sm:gap-5">
                 <motion.span
-                  initial={{ y: "110%" }}
-                  animate={{ y: "0%" }}
-                  transition={{ duration: 0.9, ease: easeOut, delay: 0.15 + i * 0.07 }}
-                  className="inline-block pr-[0.25em]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.35 + i * 0.12 }}
+                  className="mt-[0.55em] w-6 shrink-0 font-sans text-xs font-semibold tabular-nums tracking-wider text-accent-deep"
                 >
-                  {word}
+                  0{i + 1}
                 </motion.span>
+                <span className="block overflow-hidden pb-[0.08em]">
+                  <motion.span
+                    initial={{ y: "105%" }}
+                    animate={{ y: "0%" }}
+                    transition={{ duration: 0.95, ease: easeOut, delay: 0.2 + i * 0.12 }}
+                    className={`block whitespace-nowrap ${line.accent ? "italic text-accent" : ""}`}
+                  >
+                    {line.text}
+                  </motion.span>
+                </span>
               </span>
             ))}
-            <span className="inline-block overflow-hidden pb-1 align-bottom">
-              <motion.span
-                initial={{ y: "110%" }}
-                animate={{ y: "0%" }}
-                transition={{ duration: 0.9, ease: easeOut, delay: 0.15 + headline.length * 0.07 }}
-                className="inline-block italic text-accent"
-              >
-                kamu.
-              </motion.span>
-            </span>
           </h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: easeOut, delay: 0.75 }}
-            className="mt-6 max-w-lg text-lg leading-relaxed text-muted"
+            transition={{ duration: 0.8, ease: easeOut, delay: 0.7 }}
+            className="mt-8 max-w-md pl-10 text-lg leading-relaxed text-muted sm:pl-11"
           >
-            Estimasi personal color, analisis body shape, dan virtual try-on berbasis AI — semuanya
-            dalam satu paket <strong className="font-semibold text-ink">Rp19.000</strong>. Tanpa
-            akun, tanpa langganan.
+            Upload satu foto. Kamu dapat estimasi personal color, body shape, dan satu simulasi
+            virtual try-on dalam satu laporan privat.
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: easeOut, delay: 0.9 }}
-            className="mt-9 flex flex-wrap items-center gap-3"
+            transition={{ duration: 0.8, ease: easeOut, delay: 0.85 }}
+            className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4 pl-10 sm:pl-11"
           >
             <Magnetic>
               <a
                 href="#harga"
-                className="group inline-flex items-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
+                className="group inline-flex items-center gap-3 rounded-full bg-ink py-2 pl-6 pr-2 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
               >
-                Mulai Analisis
-                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                Mulai analisis
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink transition-transform group-hover:translate-x-0.5">
+                  <ArrowRight size={15} />
+                </span>
               </a>
             </Magnetic>
             <a
               href="#cara-kerja"
-              className="rounded-full border border-ink/15 px-7 py-4 text-sm font-medium text-ink transition-colors hover:border-ink/40"
+              className="group text-sm font-medium text-ink underline decoration-ink/25 underline-offset-[6px] transition-colors hover:decoration-ink"
             >
-              Lihat cara kerja
+              Lihat cara kerjanya
             </a>
           </motion.div>
 
-          <motion.ul
+          {/* Plain facts, set like a spec row */}
+          <motion.dl
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 1.1 }}
-            className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted"
+            transition={{ duration: 1, delay: 1.05 }}
+            className="mt-12 grid max-w-md grid-cols-3 divide-x divide-line border-t border-line pt-5 sm:ml-11"
           >
-            <li>✦ Bayar via QRIS</li>
-            <li>✦ Laporan privat 72 jam</li>
-            <li>✦ Hasil berupa estimasi</li>
-          </motion.ul>
+            {facts.map(([value, label]) => (
+              <div key={label} className="px-4 first:pl-0">
+                <dt className="font-display text-2xl text-ink">{value}</dt>
+                <dd className="mt-0.5 text-xs text-muted">{label}</dd>
+              </div>
+            ))}
+          </motion.dl>
         </motion.div>
 
         {/* Phone mockup */}

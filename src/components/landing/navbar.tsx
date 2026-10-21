@@ -74,7 +74,7 @@ export function Navbar() {
               href="#harga"
               className="hidden rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent-deep sm:inline-block"
             >
-              Mulai Analisis
+              Mulai analisis
             </a>
             <button
               type="button"
@@ -120,7 +120,7 @@ export function Navbar() {
                 onClick={() => setOpen(false)}
                 className="mt-2 block rounded-full bg-ink px-5 py-3 text-center text-sm font-medium text-paper"
               >
-                Mulai Analisis
+                Mulai analisis
               </a>
             </motion.div>
           )}

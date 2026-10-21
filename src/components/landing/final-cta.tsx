@@ -108,7 +108,7 @@ export function FinalCta() {
                 href="#harga"
                 className="group pointer-events-auto inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-accent-soft"
               >
-                Mulai Analisis
+                Mulai analisis
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
               </a>
             </Magnetic>
