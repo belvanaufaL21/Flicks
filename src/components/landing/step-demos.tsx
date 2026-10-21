@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, Link2, Lock, ScanLine } from "lucide-react";
+import { Check, Clock, Link2, Lock, ScanLine, ShieldCheck, Sparkles, X } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import { brand } from "@/lib/brand";
 
@@ -28,19 +28,182 @@ function usePhase(durations: readonly number[], active: boolean) {
 }
 
 // Demos are laid out at one fixed phone size and scaled with `zoom`, so their
-// content wraps the same way on every screen.
-export function DemoPhone({ children }: { children: React.ReactNode }) {
+// content (and the floating callouts beside the phone) wrap the same way on every screen.
+export function DemoPhone({ children, callouts }: { children: React.ReactNode; callouts?: React.ReactNode }) {
   return (
-    <div className="relative h-[535px] w-[260px] shrink-0 rounded-[2.6rem] bg-ink p-2.5 shadow-[0_40px_80px_-30px_rgba(37,34,31,0.6)] [zoom:0.74] sm:[zoom:0.85] lg:[zoom:1] lg:[@media(max-height:800px)]:[zoom:0.86] lg:[@media(max-height:680px)]:[zoom:0.72]">
-      <div className="absolute left-1/2 top-4 z-20 h-4 w-16 -translate-x-1/2 rounded-full bg-ink" />
-      <div className="relative h-full w-full overflow-hidden rounded-[2.1rem] bg-paper text-ink">
-        <div className="flex items-center justify-between px-6 pt-3 text-[10px] font-semibold">
-          <span>9:41</span>
-          <span className="tracking-tighter">▮▮▮</span>
+    <div className="relative h-[535px] w-[260px] shrink-0 [zoom:0.74] sm:[zoom:0.85] lg:[zoom:1] lg:[@media(max-height:820px)]:[zoom:0.86] lg:[@media(max-height:700px)]:[zoom:0.72]">
+      {/* Floor shadow */}
+      <div className="absolute -bottom-8 left-1/2 h-10 w-[85%] -translate-x-1/2 rounded-[50%] bg-ink/35 blur-xl" />
+      {/* Side buttons */}
+      <span className="absolute -left-[3px] top-24 h-8 w-[4px] rounded-l-sm bg-gradient-to-r from-[#5a534c] to-[#2c2824]" />
+      <span className="absolute -left-[3px] top-36 h-14 w-[4px] rounded-l-sm bg-gradient-to-r from-[#5a534c] to-[#2c2824]" />
+      <span className="absolute -right-[3px] top-32 h-20 w-[4px] rounded-r-sm bg-gradient-to-l from-[#5a534c] to-[#2c2824]" />
+
+      {/* Metal frame → black bezel → screen */}
+      <div className="relative h-full w-full rounded-[2.75rem] bg-gradient-to-br from-[#6b635b] via-[#2b2723] to-[#4a443e] p-[3px] shadow-[0_50px_90px_-30px_rgba(37,34,31,0.75),inset_0_1px_1px_rgba(255,255,255,0.35)]">
+        <div className="h-full w-full rounded-[2.6rem] bg-[#0e0d0c] p-[9px]">
+          <div className="relative h-full w-full overflow-hidden rounded-[2.15rem] bg-paper text-ink">
+            <div className="absolute left-1/2 top-2.5 z-40 h-[22px] w-[78px] -translate-x-1/2 rounded-full bg-black" />
+            <StatusBar />
+            <div className="absolute inset-x-0 bottom-0 top-10">{children}</div>
+            {/* Home indicator + glass sheen */}
+            <span className="absolute bottom-1.5 left-1/2 z-40 h-1 w-24 -translate-x-1/2 rounded-full bg-ink/70" />
+            <span className="pointer-events-none absolute inset-0 z-40 bg-[linear-gradient(125deg,rgba(255,255,255,0.28)_0%,rgba(255,255,255,0.06)_28%,transparent_42%)]" />
+          </div>
         </div>
-        <div className="absolute inset-x-0 bottom-0 top-9">{children}</div>
       </div>
+      {callouts}
     </div>
+  );
+}
+
+function StatusBar() {
+  return (
+    <div className="relative z-30 flex items-center justify-between px-7 pt-3.5 text-[11px] font-semibold">
+      <span>9:41</span>
+      <span className="flex items-center gap-1">
+        <span className="flex items-end gap-[1.5px]">
+          {[4, 6, 8, 10].map((h) => (
+            <span key={h} className="w-[2.5px] rounded-sm bg-ink" style={{ height: h }} />
+          ))}
+        </span>
+        <span className="ml-0.5 flex h-[10px] w-[20px] items-center rounded-[3px] border border-ink/60 p-[1.5px]">
+          <span className="h-full w-[70%] rounded-[1.5px] bg-ink" />
+        </span>
+      </span>
+    </div>
+  );
+}
+
+// A card that floats beside the phone, popping out toward the viewer.
+function Callout({
+  active,
+  delay = 0,
+  className,
+  children,
+}: {
+  active: boolean;
+  delay?: number;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.6, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ type: "spring", stiffness: 220, damping: 18, delay }}
+          className={`absolute z-50 ${className}`}
+        >
+          <motion.div
+            animate={{ y: [0, -7, 0] }}
+            transition={{ duration: 4.5, ease: "easeInOut", repeat: Infinity, delay }}
+            className="rounded-2xl bg-paper px-3.5 py-3 text-ink shadow-[0_28px_50px_-18px_rgba(37,34,31,0.5)] ring-1 ring-line/70"
+          >
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+type CalloutProps = { active: boolean };
+
+export function PayCallouts({ active }: CalloutProps) {
+  return (
+    <>
+      <Callout active={active} delay={0.5} className="-left-28 top-24 w-40">
+        <p className={label}>Total bayar</p>
+        <p className="mt-1 font-display text-2xl">Rp19.000</p>
+        <p className="text-[10px] text-muted">QRIS · sekali bayar</p>
+      </Callout>
+      <Callout active={active} delay={0.8} className="-right-24 bottom-28 hidden sm:block">
+        <p className="flex items-center gap-2 text-[11px] font-medium">
+          <ShieldCheck size={15} className="text-accent-deep" /> Tanpa akun
+        </p>
+      </Callout>
+    </>
+  );
+}
+
+export function UploadCallouts({ active }: CalloutProps) {
+  return (
+    <>
+      <Callout active={active} delay={0.5} className="-left-28 top-16 -rotate-6">
+        <div className="relative h-32 w-24 overflow-hidden rounded-lg bg-[#e3cfb3]">
+          <Image src="/images/model-before.webp" alt="" fill sizes="96px" className="object-cover object-top" />
+        </div>
+        <p className="mt-2 flex items-center gap-1 text-[10px] font-medium">
+          <Check size={11} className="text-accent-deep" /> Contoh foto ideal
+        </p>
+      </Callout>
+      <Callout active={active} delay={0.8} className="-right-24 bottom-32 hidden sm:block">
+        <p className="flex items-center gap-2 text-[11px] font-medium">
+          <Lock size={14} className="text-accent-deep" /> Disimpan privat
+        </p>
+      </Callout>
+    </>
+  );
+}
+
+export function AnalyzeCallouts({ active }: CalloutProps) {
+  return (
+    <>
+      <Callout active={active} delay={0.5} className="-left-32 top-20 w-40">
+        <p className={label}>Yang dibaca AI</p>
+        <div className="mt-2 flex gap-1">
+          {palette.map((c) => (
+            <span key={c} className="h-5 w-5 rounded-full ring-2 ring-paper" style={{ background: c }} />
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] text-muted">Warna kulit, rambut & mata</p>
+      </Callout>
+      <Callout active={active} delay={0.8} className="-right-28 bottom-36 w-36">
+        <p className={label}>Plus</p>
+        <p className="mt-1 text-[11px] font-medium leading-snug">Tingkat keyakinan di setiap hasil</p>
+      </Callout>
+    </>
+  );
+}
+
+export function TryOnCallouts({ active }: CalloutProps) {
+  return (
+    <>
+      <Callout active={active} delay={0.5} className="-left-28 top-20 w-36 rotate-[-4deg]">
+        <div className="relative aspect-square overflow-hidden rounded-xl bg-[#ede6da]">
+          <Image src="/images/product-wrap-blouse.webp" alt="" fill sizes="144px" className="object-cover" />
+        </div>
+        <p className="mt-2 text-[11px] font-semibold">Wrap Blouse</p>
+        <p className="text-[10px] text-muted">Dusty Rose · dipilih</p>
+      </Callout>
+      <Callout active={active} delay={0.8} className="-right-24 bottom-32 hidden sm:block">
+        <p className="flex items-center gap-2 text-[11px] font-medium">
+          <Sparkles size={14} className="text-accent-deep" /> Simulasi AI
+        </p>
+      </Callout>
+    </>
+  );
+}
+
+export function ReportCallouts({ active }: CalloutProps) {
+  return (
+    <>
+      <Callout active={active} delay={0.5} className="-left-28 top-24 w-40">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+          <Clock size={11} /> Sisa waktu
+        </p>
+        <p className="mt-1 font-display text-2xl tabular-nums">71:59:58</p>
+        <p className="text-[10px] text-muted">lalu tautan ditutup</p>
+      </Callout>
+      <Callout active={active} delay={0.8} className="-right-24 bottom-28 hidden sm:block">
+        <p className="flex items-center gap-1.5 font-mono text-[10px] text-accent-deep">
+          <Link2 size={12} /> /report/a8f3…
+        </p>
+      </Callout>
+    </>
   );
 }
 
@@ -90,8 +253,14 @@ export function PayDemo({ active }: DemoProps) {
     <AnimatePresence mode="wait">
       {phase === 0 && (
         <Screen key="checkout">
-          <p className={label}>Checkout</p>
-          <p className="mt-2 font-display text-2xl">1 Token FLICKS</p>
+          <div className="relative -mx-2 h-28 overflow-hidden rounded-2xl bg-[#e3cfb3]">
+            <Image src="/images/model-after.webp" alt="" fill sizes="240px" className="object-cover object-[50%_22%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent" />
+            <p className="absolute bottom-2.5 left-3 font-display text-xl text-paper">1 Token FLICKS</p>
+            <span className="absolute right-2.5 top-2.5 rounded-full bg-paper/90 px-2 py-0.5 text-[9px] font-semibold text-accent-deep">
+              Checkout
+            </span>
+          </div>
           <ul className="mt-4 space-y-2 text-xs text-muted">
             {["Personal color", "Body shape", "Virtual try-on"].map((t) => (
               <li key={t} className="flex items-center gap-2">
@@ -110,9 +279,15 @@ export function PayDemo({ active }: DemoProps) {
         </Screen>
       )}
       {phase === 1 && (
-        <Screen key="qr" className="items-center text-center">
+        <Screen key="qr" className="items-center bg-gradient-to-b from-accent-soft via-paper to-paper text-center">
           <p className={label}>Scan untuk bayar</p>
-          <div className="mt-5 grid grid-cols-11 gap-[2px] rounded-2xl bg-cream p-3">
+          <div className="relative mt-4 grid grid-cols-11 gap-[2px] rounded-2xl bg-paper p-3.5 shadow-[0_18px_30px_-16px_rgba(37,34,31,0.45)] ring-1 ring-line">
+            {/* Scanner sweep over the code */}
+            <motion.span
+              animate={{ top: ["8%", "86%", "8%"] }}
+              transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
+              className="pointer-events-none absolute inset-x-6 z-10 h-0.5 rounded-full bg-accent/80 shadow-[0_0_14px_3px_rgba(154,128,96,0.5)]"
+            />
             {qrCells.map((on, i) => (
               <motion.span
                 key={i}
@@ -147,15 +322,27 @@ export function PayDemo({ active }: DemoProps) {
         </Screen>
       )}
       {phase === 3 && (
-        <Screen key="done" className="items-center justify-center text-center">
-          <motion.span
-            initial={{ scale: 0, rotate: -40 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 14 }}
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-paper"
-          >
-            <Check size={30} />
-          </motion.span>
+        <Screen key="done" className="items-center justify-center bg-gradient-to-b from-paper to-accent-soft text-center">
+          <span className="relative flex h-16 w-16 items-center justify-center">
+            {/* Success pulse rings */}
+            {[0, 1].map((r) => (
+              <motion.span
+                key={r}
+                initial={{ scale: 1, opacity: 0.5 }}
+                animate={{ scale: 2.4, opacity: 0 }}
+                transition={{ duration: 1.6, ease: "easeOut", repeat: Infinity, delay: 0.3 + r * 0.6 }}
+                className="absolute inset-0 rounded-full border-2 border-accent"
+              />
+            ))}
+            <motion.span
+              initial={{ scale: 0, rotate: -40 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 14 }}
+              className="relative flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-paper shadow-[0_12px_24px_-8px_rgba(111,91,64,0.7)]"
+            >
+              <Check size={30} />
+            </motion.span>
+          </span>
           <p className="mt-5 font-display text-2xl">Token aktif</p>
           <p className="mt-1 text-[11px] text-muted">1 token siap dipakai</p>
         </Screen>
@@ -175,8 +362,32 @@ export function UploadDemo({ active }: DemoProps) {
       {phase === 0 && (
         <Screen key="guide">
           <p className={label}>Panduan foto</p>
-          <p className="mt-2 font-display text-2xl leading-tight">Biar hasilnya lebih akurat</p>
-          <ul className="mt-5 space-y-3 text-xs">
+          <p className="mt-1.5 font-display text-xl leading-tight">Biar hasilnya lebih akurat</p>
+          {/* Do / don't example photos */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {[
+              { ok: true, text: "Benar", filter: "" },
+              { ok: false, text: "Hindari", filter: "brightness-[0.45] contrast-75 blur-[1.5px]" },
+            ].map((ex, i) => (
+              <motion.div
+                key={ex.text}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.15 }}
+                className="relative h-28 overflow-hidden rounded-xl bg-[#e3cfb3]"
+              >
+                <Image src="/images/model-before.webp" alt="" fill sizes="110px" className={`object-cover object-top ${ex.filter}`} />
+                <span
+                  className={`absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                    ex.ok ? "bg-paper text-accent-deep" : "bg-ink text-paper"
+                  }`}
+                >
+                  {ex.ok ? <Check size={9} /> : <X size={9} />} {ex.text}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+          <ul className="mt-4 space-y-2.5 text-xs">
             {["Cahaya alami & merata", "Tanpa filter", "Latar belakang polos", "Badan terlihat penuh"].map((t, i) => (
               <li key={t} className="flex items-center gap-3">
                 <motion.span
@@ -429,22 +640,32 @@ export function TryOnDemo({ active }: DemoProps) {
         </Screen>
       )}
       {phase === 2 && (
-        <Screen key="render" className="items-center justify-center text-center">
-          <svg viewBox="0 0 50 50" className="h-16 w-16 -rotate-90">
-            <circle cx="25" cy="25" r="21" fill="none" stroke={brand.line} strokeWidth="4" />
-            <motion.circle
-              cx="25"
-              cy="25"
-              r="21"
-              fill="none"
-              stroke={brand.accent}
-              strokeWidth="4"
-              strokeLinecap="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 1.8, ease: "easeInOut" }}
-            />
-          </svg>
+        <Screen key="render" className="items-center justify-center bg-gradient-to-b from-paper to-accent-soft text-center">
+          {/* Chosen product inside a progress ring, pulsing while it renders */}
+          <div className="relative h-36 w-36">
+            <svg viewBox="0 0 50 50" className="absolute inset-0 h-full w-full -rotate-90">
+              <circle cx="25" cy="25" r="23" fill="none" stroke={brand.line} strokeWidth="1.5" />
+              <motion.circle
+                cx="25"
+                cy="25"
+                r="23"
+                fill="none"
+                stroke={brand.accent}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 1.8, ease: "easeInOut" }}
+              />
+            </svg>
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1.2, ease: "easeInOut", repeat: Infinity }}
+              className="absolute inset-3 overflow-hidden rounded-full bg-[#ede6da] shadow-[0_14px_28px_-12px_rgba(37,34,31,0.5)]"
+            >
+              <Image src="/images/product-wrap-blouse.webp" alt="" fill sizes="120px" className="object-cover" />
+            </motion.div>
+          </div>
           <p className="mt-5 text-sm font-medium">Membuat simulasi try-on</p>
           <p className="mt-1 text-[11px] text-muted">Wrap Blouse · Dusty Rose</p>
         </Screen>
