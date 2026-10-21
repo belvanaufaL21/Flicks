@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
 import { easeOut, fadeUp, Reveal, Stagger } from "@/components/motion/reveal";
-import { MorphBlob, RotatingBadge } from "@/components/motion/shapes";
+import { MorphBlob } from "@/components/motion/shapes";
 import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
@@ -62,13 +62,47 @@ export function Faq() {
           }
           description="Belum menemukan jawabannya? Detail lengkap selalu ditampilkan sebelum kamu membayar."
         />
-        {/* Arch window with a slowly spinning badge inside */}
-        <Reveal delay={0.2} className="relative mt-12 hidden h-72 w-56 overflow-hidden rounded-t-full bg-accent-soft lg:block">
+        {/* Arch window with a short question-and-answer exchange playing inside */}
+        <Reveal delay={0.2} className="relative mt-12 hidden h-80 w-64 overflow-hidden rounded-t-full bg-accent-soft lg:block">
           <MorphBlob className="absolute -bottom-16 -left-10 h-64 w-64 text-line" />
-          <div className="absolute inset-0 flex items-center justify-center text-ink">
-            <RotatingBadge text="tanya apa saja • flicks lite • " size={132}>
-              <span className="font-display text-4xl italic text-accent-deep">?</span>
-            </RotatingBadge>
+          <div className="absolute inset-x-5 bottom-8 flex flex-col gap-3 text-sm">
+            <motion.p
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.5 }}
+              className="ml-auto origin-bottom-right rounded-2xl rounded-br-md bg-paper px-4 py-2.5 text-ink shadow-sm"
+            >
+              Perlu bikin akun?
+            </motion.p>
+            <div className="relative">
+              {/* Typing dots hold the reply's place, then give way to it */}
+              <motion.span
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: [0, 1, 1, 0] }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.5, times: [0, 0.1, 0.85, 1], delay: 1 }}
+                className="absolute left-0 top-0 flex gap-1 rounded-2xl rounded-bl-md bg-ink px-4 py-3.5"
+              >
+                {[0, 1, 2].map((d) => (
+                  <motion.span
+                    key={d}
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.12 }}
+                    className="h-1.5 w-1.5 rounded-full bg-paper/70"
+                  />
+                ))}
+              </motion.span>
+              <motion.p
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ type: "spring", stiffness: 260, damping: 20, delay: 2.5 }}
+                className="mr-6 origin-bottom-left rounded-2xl rounded-bl-md bg-ink px-4 py-2.5 text-paper shadow-sm"
+              >
+                Tidak. Cukup buka tautan rahasia, aktif 72 jam.
+              </motion.p>
+            </div>
           </div>
         </Reveal>
       </div>

@@ -3,9 +3,9 @@
 import { useRef } from "react";
 import Image from "next/image";
 import { motion, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
-import { ArrowRight, ScanLine, Sparkles } from "lucide-react";
+import { ArrowRight, ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
-import { Magnetic, RotatingBadge } from "@/components/motion/shapes";
+import { Magnetic } from "@/components/motion/shapes";
 
 const headline = ["Temukan", "warna", "&", "siluet", "yang", "paling"];
 const palette = ["#b5835a", "#8a9a5b", "#a26769", "#d4a373", "#6b7f6a"];
@@ -155,15 +155,30 @@ export function Hero() {
             transition={{ duration: 1.5, delay: 0.5 }}
             className="absolute inset-x-2 -bottom-2 top-2 translate-x-4 rounded-t-full border border-accent/50 sm:inset-x-6"
           />
+          {/* Hang tag with the package price, swaying from a short string */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, y: -24 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, ease: easeOut, delay: 1.2 }}
-            className="absolute -bottom-10 right-0 z-10 rounded-full bg-ink text-paper shadow-xl sm:-right-6"
+            className="absolute -bottom-6 right-3 z-10 sm:right-0"
           >
-            <RotatingBadge text="AI styling • personal color • try-on • " size={112}>
-              <Sparkles size={22} className="text-accent-light" />
-            </RotatingBadge>
+            <motion.div
+              animate={{ rotate: [-5, 3] }}
+              transition={{ duration: 2.8, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
+              style={{ transformOrigin: "50% -28px" }}
+              className="relative w-28 rounded-t-[3.5rem] rounded-b-2xl bg-ink px-4 pb-4 pt-9 text-center text-paper shadow-[0_24px_40px_-16px_rgba(37,34,31,0.6)]"
+            >
+              <span className="absolute -top-7 left-1/2 h-10 w-px -translate-x-1/2 bg-ink/40" />
+              <span className="absolute left-1/2 top-3 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-cream ring-1 ring-accent/40" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-light">1 token</p>
+              <p className="mt-1 font-display text-3xl leading-none">Rp19rb</p>
+              <div className="my-3 border-t border-dashed border-paper/20" />
+              <p className="text-[11px] leading-snug text-paper/70">
+                3 hasil
+                <br />
+                sekali bayar
+              </p>
+            </motion.div>
           </motion.div>
 
           <motion.div

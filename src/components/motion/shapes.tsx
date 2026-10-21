@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useRef } from "react";
 import {
   motion,
   useMotionTemplate,
@@ -22,36 +22,6 @@ export function Grain() {
       className="pointer-events-none fixed inset-0 z-[70] opacity-[0.07] mix-blend-multiply"
       style={{ backgroundImage: noise }}
     />
-  );
-}
-
-type BadgeProps = {
-  text: string;
-  size?: number;
-  className?: string;
-  children?: React.ReactNode;
-};
-
-// Circular text that slowly spins around a centered icon.
-export function RotatingBadge({ text, size = 120, className = "", children }: BadgeProps) {
-  const id = `badge-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  return (
-    <div className={`relative ${className}`} style={{ width: size, height: size }} aria-hidden="true">
-      <motion.svg
-        viewBox="0 0 100 100"
-        className="absolute inset-0 h-full w-full"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 20, ease: "linear", repeat: Infinity }}
-      >
-        <defs>
-          <path id={id} d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0" />
-        </defs>
-        <text className="fill-current text-[8.6px] font-semibold uppercase tracking-[0.18em]">
-          <textPath href={`#${id}`}>{text}</textPath>
-        </text>
-      </motion.svg>
-      <div className="absolute inset-0 flex items-center justify-center">{children}</div>
-    </div>
   );
 }
 

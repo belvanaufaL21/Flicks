@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Check, Tag } from "lucide-react";
+import { ArrowRight, Check, QrCode } from "lucide-react";
 import { easeOut, fadeUp, Reveal, Stagger } from "@/components/motion/reveal";
-import { Magnetic, RotatingBadge } from "@/components/motion/shapes";
+import { Magnetic } from "@/components/motion/shapes";
 import { SectionHeading } from "./section-heading";
 
 const included = [
@@ -12,6 +12,65 @@ const included = [
   ["1× Virtual Try-On", "Simulasi satu produk pilihan dari katalog"],
   ["Laporan privat 72 jam", "Dikirim lewat tautan rahasia, tanpa perlu akun"],
 ];
+
+const receiptRows = [
+  ["1× Token FLICKS", "Rp19.000"],
+  ["Biaya langganan", "Rp0"],
+  ["Biaya tersembunyi", "Rp0"],
+];
+
+// Zigzag tear along the bottom edge of the receipt.
+const tornEdge =
+  "[mask:conic-gradient(from_-45deg_at_bottom,#0000,#000_1deg_89deg,#0000_90deg)_50%/14px_100%]";
+
+// A receipt that "prints" downward when it scrolls into view. The in-view trigger lives on
+// an unclipped wrapper: a fully clipped element never counts as intersecting.
+function Receipt() {
+  return (
+    <motion.div
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.6 }}
+      className="mt-12 max-w-xs -rotate-2"
+    >
+      <motion.div
+        variants={{ hidden: { clipPath: "inset(0 0 100% 0)" }, show: { clipPath: "inset(0 0 0% 0)" } }}
+        transition={{ duration: 1.4, ease: easeOut, delay: 0.2 }}
+        className={`bg-paper px-6 pb-9 pt-6 shadow-[0_24px_40px_-24px_rgba(37,34,31,0.4)] ${tornEdge}`}
+      >
+        <div className="flex items-center justify-between text-xs text-muted">
+          <span className="font-display text-lg text-ink">FLICKS Lite</span>
+          <span className="flex items-center gap-1.5">
+            <QrCode size={14} /> QRIS
+          </span>
+        </div>
+        <div className="my-4 border-t border-dashed border-line" />
+        <ul className="space-y-2 font-mono text-xs text-muted">
+          {receiptRows.map(([label, value], i) => (
+            <motion.li
+              key={label}
+              variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}
+              transition={{ delay: 0.6 + i * 0.25 }}
+              className="flex justify-between gap-4"
+            >
+              <span>{label}</span>
+              <span className="text-ink">{value}</span>
+            </motion.li>
+          ))}
+        </ul>
+        <div className="my-4 border-t border-dashed border-line" />
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }}
+          transition={{ delay: 1.5, ease: easeOut }}
+          className="flex items-baseline justify-between"
+        >
+          <span className="text-xs font-semibold uppercase tracking-widest text-muted">Total</span>
+          <span className="font-display text-3xl text-ink">Rp19.000</span>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // Arch-topped like a boutique hang tag; inner radius is the outer minus the border.
 const outerShape = "rounded-t-[11rem] rounded-b-[2.25rem]";
@@ -44,11 +103,7 @@ export function Pricing() {
               </motion.span>
             ))}
           </Stagger>
-          <Reveal delay={0.2} className="mt-12 hidden text-ink lg:block">
-            <RotatingBadge text="sekali bayar • tanpa langganan • " size={128}>
-              <Tag size={24} className="text-accent" />
-            </RotatingBadge>
-          </Reveal>
+          <Receipt />
         </div>
 
         <Reveal y={80} className="mx-auto w-full max-w-md">
