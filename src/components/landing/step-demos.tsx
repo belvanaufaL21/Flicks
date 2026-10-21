@@ -556,7 +556,7 @@ export function AnalyzeDemo({ active }: DemoProps) {
               </div>
             )}
             {phase === 3 && (
-              <div className="space-y-2">
+              <div className="divide-y divide-line">
                 {[
                   ["Personal color", "Soft Autumn"],
                   ["Body shape", "Hourglass"],
@@ -566,15 +566,15 @@ export function AnalyzeDemo({ active }: DemoProps) {
                     initial={{ opacity: 0, x: 12 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.25 }}
-                    className="flex items-end justify-between"
+                    className="py-2 first:pt-0 last:pb-0"
                   >
-                    <div>
-                      <p className={label}>{k}</p>
-                      <p className="font-display text-lg leading-tight">{v}</p>
+                    <p className={`${label} whitespace-nowrap`}>{k}</p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="font-display text-lg leading-none">{v}</p>
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[9px] font-medium text-accent-deep">
+                        keyakinan sedang
+                      </span>
                     </div>
-                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[9px] font-medium text-accent-deep">
-                      keyakinan sedang
-                    </span>
                   </motion.div>
                 ))}
               </div>
