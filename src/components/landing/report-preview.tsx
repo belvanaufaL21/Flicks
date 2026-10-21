@@ -14,7 +14,6 @@ import Image from "next/image";
 import { Clock, Info, Lock } from "lucide-react";
 import { easeOut, Reveal } from "@/components/motion/reveal";
 import { DomeSection } from "@/components/motion/shapes";
-import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
 const tabs = [
@@ -98,7 +97,7 @@ export function ReportPreview() {
           style={{ rotateX, scale, transformPerspective: 1400 }}
           className="mx-auto mt-8 max-w-4xl origin-bottom"
         >
-          <div className="overflow-hidden rounded-[32px] border border-line bg-cream/90 shadow-[0_40px_80px_-40px_rgba(37,34,31,0.35)] backdrop-blur">
+          <div className="overflow-hidden rounded-[32px] border border-line bg-cream shadow-[0_40px_80px_-40px_rgba(37,34,31,0.35)]">
             <div className="flex items-center justify-between gap-4 border-b border-line bg-paper/80 px-6 py-4">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <Lock size={14} />
@@ -202,7 +201,7 @@ function ColorPanel() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-paper/50 px-4 py-2.5 backdrop-blur">
+    <div className="flex items-center justify-between rounded-xl bg-paper/60 px-4 py-2.5">
       <span className="text-ink/70">{label}</span>
       <span className="font-semibold">{value}</span>
     </div>
@@ -213,36 +212,32 @@ const shapes = [
   {
     id: "rectangle",
     name: "Rectangle",
-    widths: [30, 27, 30],
+    image: "/images/shape-rectangle.webp",
     desc: "Bahu, pinggang, dan pinggul relatif sejajar.",
     tips: ["Belt atau peplum untuk memberi kesan lekuk", "Layering dan potongan berstruktur", "Atasan dengan detail di bagian dada"],
   },
   {
     id: "pear",
     name: "Pear",
-    widths: [24, 22, 37],
+    image: "/images/shape-pear.webp",
     desc: "Pinggul lebih lebar dari bahu.",
     tips: ["Detail atau warna terang di area bahu", "Rok A-line dan celana straight", "Atasan dengan neckline lebar"],
   },
   {
     id: "hourglass",
     name: "Hourglass",
-    widths: [33, 18, 33],
+    image: "/images/shape-hourglass.webp",
     desc: "Bahu dan pinggul seimbang, pinggang terdefinisi.",
     tips: ["Wrap dress dan potongan high-waist", "Bahan yang jatuh mengikuti tubuh", "Belt di titik pinggang alami"],
   },
   {
     id: "inverted",
     name: "Inverted Triangle",
-    widths: [38, 24, 24],
+    image: "/images/shape-inverted.webp",
     desc: "Bahu lebih lebar dari pinggul.",
     tips: ["V-neck untuk memecah garis bahu", "Celana wide-leg dan rok bervolume", "Detail atau motif di bagian bawah"],
   },
 ];
-
-function silhouette([s, w, h]: number[]) {
-  return `M${100 - s} 24 Q100 14 ${100 + s} 24 Q${100 + s + 2} 52 ${100 + w} 78 Q${100 + h + 4} 100 ${100 + h} 120 L${100 + h * 0.8} 170 L${100 - h * 0.8} 170 L${100 - h} 120 Q${100 - h - 4} 100 ${100 - w} 78 Q${100 - s - 2} 52 ${100 - s} 24 Z`;
-}
 
 function BodyPanel() {
   const [selected, setSelected] = useState("hourglass");
@@ -251,37 +246,40 @@ function BodyPanel() {
   return (
     <div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {shapes.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setSelected(s.id)}
-            className="relative rounded-2xl p-4 text-left"
-          >
-            {selected === s.id && (
-              <motion.span
-                layoutId="shape-highlight"
-                transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                className="absolute inset-0 rounded-2xl border border-accent/40 bg-paper shadow-sm"
-              />
-            )}
-            <span className="relative block">
-              <svg viewBox="40 0 120 190" className="mx-auto h-28 w-auto">
-                <motion.path
-                  d={silhouette(s.widths)}
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 1.2, ease: easeOut }}
-                  fill={selected === s.id ? brand.accentSoft : "transparent"}
-                  stroke={selected === s.id ? brand.accent : "#bfb3a2"}
-                  strokeWidth="2"
+        {shapes.map((s) => {
+          const isSelected = selected === s.id;
+          return (
+            <button key={s.id} onClick={() => setSelected(s.id)} className="group relative rounded-2xl p-1.5 text-left">
+              {isSelected && (
+                <motion.span
+                  layoutId="shape-highlight"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  className="absolute inset-0 rounded-2xl border border-accent/50 bg-paper shadow-sm"
                 />
-              </svg>
-              <span className={`mt-2 block text-center text-sm font-medium ${selected === s.id ? "text-accent-deep" : "text-muted"}`}>
-                {s.name}
+              )}
+              <span className="relative block">
+                <span className="relative block aspect-[3/4] overflow-hidden rounded-xl bg-[#ede6da]">
+                  <Image
+                    src={s.image}
+                    alt={`Dress form dengan bentuk tubuh ${s.name}`}
+                    fill
+                    sizes="(min-width: 640px) 200px, 45vw"
+                    className={`object-cover transition duration-500 group-hover:scale-105 ${
+                      isSelected ? "" : "opacity-70 saturate-50"
+                    }`}
+                  />
+                </span>
+                <span
+                  className={`mt-2 block pb-1 text-center text-sm font-medium ${
+                    isSelected ? "text-accent-deep" : "text-muted"
+                  }`}
+                >
+                  {s.name}
+                </span>
               </span>
-            </span>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
       <AnimatePresence mode="wait">
         <motion.div

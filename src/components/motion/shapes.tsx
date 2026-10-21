@@ -1,15 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import {
-  motion,
-  useMotionTemplate,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-  type HTMLMotionProps,
-} from "motion/react";
+import { motion, useReducedMotion, useSpring } from "motion/react";
 
 const noise =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
@@ -19,7 +11,7 @@ export function Grain() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[70] opacity-[0.07] mix-blend-multiply"
+      className="pointer-events-none fixed inset-0 z-[70] opacity-[0.045]"
       style={{ backgroundImage: noise }}
     />
   );
@@ -61,24 +53,18 @@ export function Magnetic({
   );
 }
 
-type DomeProps = Omit<HTMLMotionProps<"section">, "style" | "ref"> & { depth?: number };
+type DomeProps = React.ComponentProps<"section">;
 
-// Section whose top edge is a dome that flattens as it scrolls into view.
-export function DomeSection({ children, className = "", depth = 9, ...rest }: DomeProps) {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "start 25%"] });
-  const r = useTransform(scrollYProgress, [0, 1], [depth, 2.5]);
-  const radius = useMotionTemplate`50% ${r}rem`;
-
+// Section whose top edge is a shallow dome. The radius is static on purpose: animating
+// border-radius on scroll repaints the whole section every frame.
+export function DomeSection({ children, className = "", ...rest }: DomeProps) {
   return (
-    <motion.section
-      ref={ref}
-      style={{ borderTopLeftRadius: radius, borderTopRightRadius: radius }}
-      className={`relative overflow-hidden ${className}`}
+    <section
+      className={`relative overflow-hidden rounded-t-[50%_5rem] ${className}`}
       {...rest}
     >
       {children}
-    </motion.section>
+    </section>
   );
 }
 

@@ -48,11 +48,11 @@ export function Hero() {
     >
       <motion.div
         style={{ scale: blobScale }}
-        className="pointer-events-none absolute -top-40 right-[-20%] h-[640px] w-[640px] rounded-full bg-gradient-to-br from-accent/25 via-line/60 to-transparent blur-3xl"
+        className="pointer-events-none absolute -top-40 right-[-20%] h-[640px] w-[640px] bg-[radial-gradient(circle,color-mix(in_srgb,var(--color-accent)_26%,transparent)_0%,color-mix(in_srgb,var(--color-line)_45%,transparent)_40%,transparent_70%)]"
       />
       <motion.div
         style={{ scale: blobScale }}
-        className="pointer-events-none absolute bottom-[-30%] left-[-15%] h-[520px] w-[520px] rounded-full bg-gradient-to-tr from-line/70 via-accent-soft/60 to-transparent blur-3xl"
+        className="pointer-events-none absolute bottom-[-30%] left-[-15%] h-[520px] w-[520px] bg-[radial-gradient(circle,color-mix(in_srgb,var(--color-line)_70%,transparent)_0%,color-mix(in_srgb,var(--color-accent-soft)_50%,transparent)_40%,transparent_70%)]"
       />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-4 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
@@ -61,7 +61,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: easeOut }}
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-4 py-1.5 text-xs font-medium text-muted backdrop-blur"
+            className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/80 px-4 py-1.5 text-xs font-medium text-muted"
           >
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
             AI Personal Styling · Soft launch
@@ -221,7 +221,7 @@ export function Hero() {
                   className="absolute inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
                 />
 
-                <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-paper/90 px-3 py-2.5 text-xs text-ink backdrop-blur">
+                <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-paper/95 px-3 py-2.5 text-xs text-ink">
                   <ScanLine size={14} className="text-accent-deep" />
                   <span className="font-medium">Menganalisis foto</span>
                   <span className="ml-auto flex gap-1">
@@ -296,7 +296,7 @@ function FloatCard({
       <motion.div
         animate={{ y: [0, float, 0] }}
         transition={{ duration: 5, ease: "easeInOut", repeat: Infinity }}
-        className="rounded-2xl border border-line/70 bg-paper/85 px-4 py-3 shadow-[0_20px_40px_-20px_rgba(37,34,31,0.35)] backdrop-blur-md"
+        className="rounded-2xl border border-line/70 bg-paper/95 px-4 py-3 shadow-[0_20px_40px_-20px_rgba(37,34,31,0.35)]"
       >
         {children}
       </motion.div>

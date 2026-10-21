@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  easeInOut,
   motion,
   transform,
   useMotionValueEvent,
   useScroll,
-  useSpring,
   useTransform,
+  type MotionValue,
 } from "motion/react";
 import { easeOut } from "@/components/motion/reveal";
 import { brand } from "@/lib/brand";
@@ -51,6 +52,7 @@ const steps = [
   },
 ];
 
+const SEGMENT = 1 / (steps.length - 1);
 // Share of each step's scroll segment spent holding still, so its demo can be watched.
 const HOLD = 0.5;
 
@@ -59,22 +61,21 @@ export function HowItWorks() {
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const toX = useRef<(v: number) => number>(() => 0);
 
-  // Maps scroll progress to track position: each panel is centered and held for part
-  // of its segment, then the track glides to the next one.
+  // Maps scroll progress to track position: each panel is centered and held for part of
+  // its segment, then the track eases to the next one.
   useEffect(() => {
     const measure = () => {
       const vw = window.innerWidth;
-      const seg = 1 / (steps.length - 1);
       const input: number[] = [];
       const output: number[] = [];
       panelRefs.current.forEach((panel, i) => {
         if (!panel) return;
         const center = panel.offsetLeft - (vw - panel.offsetWidth) / 2;
-        const mid = i * seg;
-        input.push(Math.max(0, mid - (seg * HOLD) / 2), Math.min(1, mid + (seg * HOLD) / 2));
+        const mid = i * SEGMENT;
+        input.push(Math.max(0, mid - (SEGMENT * HOLD) / 2), Math.min(1, mid + (SEGMENT * HOLD) / 2));
         output.push(-center, -center);
       });
-      toX.current = transform(input, output);
+      toX.current = transform(input, output, { ease: easeInOut });
     };
     measure();
     window.addEventListener("resize", measure);
@@ -82,8 +83,7 @@ export function HowItWorks() {
   }, []);
 
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end end"] });
-  const smooth = useSpring(scrollYProgress, { stiffness: 120, damping: 30, mass: 0.3 });
-  const x = useTransform(smooth, (v) => toX.current(v));
+  const x = useTransform(scrollYProgress, (v) => toX.current(v));
   const [active, setActive] = useState(0);
 
   useMotionValueEvent(scrollYProgress, "change", (v) => {
@@ -123,49 +123,77 @@ export function HowItWorks() {
           </div>
         </div>
 
-        <motion.div style={{ x }} className="mt-6 flex w-max gap-[18vw] px-[7vw] lg:mt-10">
-          {steps.map(({ demo: Demo, title, body, shape, tone }, i) => {
-            const isActive = i === active;
-            return (
-              <motion.article
-                key={title}
-                ref={(el) => {
-                  panelRefs.current[i] = el;
-                }}
-                animate={{ opacity: isActive ? 1 : 0.35, scale: isActive ? 1 : 0.92 }}
-                transition={{ duration: 0.6, ease: easeOut }}
-                className="flex w-[86vw] shrink-0 flex-col items-center gap-5 lg:w-[min(64rem,86vw)] lg:flex-row lg:gap-16"
-              >
-                {/* Demo: phone in front of a soft shaped backdrop */}
-                <div className="relative flex shrink-0 items-center justify-center lg:order-2 lg:w-[30rem]">
-                  <motion.div
-                    animate={{ rotate: isActive ? 0 : -8, scale: isActive ? 1 : 0.85 }}
-                    transition={{ duration: 0.9, ease: easeOut }}
-                    className={`absolute h-[88%] w-[92%] lg:w-full ${shape} ${tone}`}
-                  />
-                  <DemoPhone>
-                    <Demo key={isActive ? "on" : "off"} active={isActive} />
-                  </DemoPhone>
-                </div>
-
-                <div className="w-full max-w-md lg:order-1 lg:flex-1">
-                  <p className="font-display text-5xl text-accent lg:text-7xl">0{i + 1}</p>
-                  <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl lg:mt-3 lg:text-4xl">{title}</h3>
-                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted sm:line-clamp-none sm:text-base lg:mt-4">
-                    {body}
-                  </p>
-                </div>
-              </motion.article>
-            );
-          })}
+        <motion.div style={{ x }} className="mt-6 flex w-max gap-[18vw] px-[7vw] will-change-transform lg:mt-10">
+          {steps.map((step, i) => (
+            <StepPanel
+              key={step.title}
+              step={step}
+              index={i}
+              active={i === active}
+              progress={scrollYProgress}
+              panelRef={(el) => {
+                panelRefs.current[i] = el;
+              }}
+            />
+          ))}
         </motion.div>
 
         <div className="mx-auto mt-6 w-full max-w-6xl px-4 sm:px-6 lg:mt-10">
           <div className="h-px bg-line">
-            <motion.div style={{ scaleX: smooth }} className="h-px origin-left bg-accent" />
+            <motion.div style={{ scaleX: scrollYProgress }} className="h-px origin-left bg-accent" />
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function StepPanel({
+  step: { demo: Demo, title, body, shape, tone },
+  index,
+  active,
+  progress,
+  panelRef,
+}: {
+  step: (typeof steps)[number];
+  index: number;
+  active: boolean;
+  progress: MotionValue<number>;
+  panelRef: (el: HTMLElement | null) => void;
+}) {
+  // 0 when this panel is centered, 1 a full segment away: drives a continuous
+  // fade, scale and backdrop tilt instead of a hard switch.
+  const distance = useTransform(progress, (v) => Math.min(1, Math.abs(v - index * SEGMENT) / SEGMENT));
+  const opacity = useTransform(distance, [0, 0.25, 1], [1, 1, 0.3]);
+  const scale = useTransform(distance, [0, 0.25, 1], [1, 1, 0.9]);
+  const backdropRotate = useTransform(distance, [0, 1], [0, -10]);
+  const backdropScale = useTransform(distance, [0, 1], [1, 0.82]);
+  const textY = useTransform(distance, [0, 1], [0, 40]);
+
+  return (
+    <motion.article
+      ref={panelRef}
+      style={{ opacity, scale }}
+      className="flex w-[86vw] shrink-0 flex-col items-center gap-5 lg:w-[min(64rem,86vw)] lg:flex-row lg:gap-16"
+    >
+      {/* Demo: phone in front of a soft shaped backdrop */}
+      <div className="relative flex shrink-0 items-center justify-center lg:order-2 lg:w-[30rem]">
+        <motion.div
+          style={{ rotate: backdropRotate, scale: backdropScale }}
+          className={`absolute h-[88%] w-[92%] lg:w-full ${shape} ${tone}`}
+        />
+        <DemoPhone>
+          <Demo key={active ? "on" : "off"} active={active} />
+        </DemoPhone>
+      </div>
+
+      <motion.div style={{ y: textY }} className="w-full max-w-md lg:order-1 lg:flex-1">
+        <p className="font-display text-5xl text-accent lg:text-7xl">0{index + 1}</p>
+        <h3 className="mt-1 font-display text-2xl text-ink sm:text-3xl lg:mt-3 lg:text-4xl">{title}</h3>
+        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted sm:line-clamp-none sm:text-base lg:mt-4">
+          {body}
+        </p>
+      </motion.div>
+    </motion.article>
   );
 }

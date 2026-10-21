@@ -24,10 +24,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Lenis animates the scroll itself; native smooth scrolling would fight it. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
+}
+
+html.lenis {
+  scroll-behavior: auto;
 }
 
 body {

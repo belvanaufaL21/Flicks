@@ -72,8 +72,15 @@ function Orb({
   const translate = useTransform(progress, [0, 1], [0, speed]);
   return (
     <motion.span
-      style={{ y: translate, left: x, top: y, width: size, height: size, background: color }}
-      className="pointer-events-none absolute rounded-full opacity-40 blur-2xl"
+      style={{
+        y: translate,
+        left: x,
+        top: y,
+        width: size * 1.8,
+        height: size * 1.8,
+        background: `radial-gradient(closest-side, ${color}, transparent)`,
+      }}
+      className="pointer-events-none absolute opacity-45"
     />
   );
 }

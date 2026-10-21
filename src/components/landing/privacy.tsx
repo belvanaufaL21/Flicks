@@ -74,7 +74,7 @@ export function Privacy() {
     <DomeSection id="privasi" className="bg-ink pt-32 pb-24 lg:pb-32">
       <motion.div
         style={{ x: glowX }}
-        className="pointer-events-none absolute -top-40 left-0 h-[500px] w-[700px] rounded-full bg-accent/25 blur-[120px]"
+        className="pointer-events-none absolute -top-40 left-0 h-[500px] w-[700px] bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_35%,transparent),transparent)]"
       />
       <div ref={ref} className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading

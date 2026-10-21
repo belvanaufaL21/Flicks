@@ -235,7 +235,7 @@ export function UploadDemo({ active }: DemoProps) {
                     initial={{ opacity: 0, x: -12 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.2 + i * 0.3 }}
-                    className="flex items-center gap-1.5 rounded-full bg-paper/90 px-2.5 py-1 text-[10px] font-medium backdrop-blur"
+                    className="flex items-center gap-1.5 rounded-full bg-paper/95 px-2.5 py-1 text-[10px] font-medium"
                   >
                     <Check size={10} className="text-accent-deep" /> {t}
                   </motion.p>
@@ -306,7 +306,7 @@ export function AnalyzeDemo({ active }: DemoProps) {
       <motion.div
         layout
         transition={{ duration: 0.45, ease: easeOut }}
-        className="absolute inset-x-3 bottom-3 rounded-2xl bg-paper/95 p-3 backdrop-blur"
+        className="absolute inset-x-3 bottom-3 rounded-2xl bg-paper/95 p-3"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -379,12 +379,11 @@ export function AnalyzeDemo({ active }: DemoProps) {
 
 const tryOnDurations = [2200, 1500, 2000, 3200] as const;
 const products = [
-  { name: "Wrap Blouse", color: "#b07f86" },
-  { name: "Linen Shirt", color: "#d9c3a5" },
-  { name: "Knit Top", color: "#8e9a7e" },
-  { name: "Basic Tee", color: "#3a3632" },
+  { name: "Wrap Blouse", image: "/images/product-wrap-blouse.webp" },
+  { name: "Linen Shirt", image: "/images/product-linen-shirt.webp" },
+  { name: "Knit Top", image: "/images/product-knit-top.webp" },
+  { name: "Basic Tee", image: "/images/product-basic-tee.webp" },
 ];
-const garment = "M14 6 L8 9 L4 16 L9 18 L10 15 L10 34 L30 34 L30 15 L31 18 L36 16 L32 9 L26 6 Q20 10 14 6 Z";
 
 export function TryOnDemo({ active }: DemoProps) {
   const phase = usePhase(tryOnDurations, active);
@@ -402,14 +401,14 @@ export function TryOnDemo({ active }: DemoProps) {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0, scale: picked ? 1.04 : 1 }}
                   transition={{ delay: phase === 0 ? i * 0.1 : 0 }}
-                  className={`relative rounded-2xl bg-cream p-2.5 ring-2 transition-colors ${
+                  className={`relative overflow-hidden rounded-2xl bg-[#ede6da] ring-2 transition-colors ${
                     picked ? "ring-accent" : "ring-transparent"
                   }`}
                 >
-                  <svg viewBox="0 0 40 40" className="mx-auto h-14 w-14">
-                    <path d={garment} fill={p.color} />
-                  </svg>
-                  <p className="mt-1 text-[10px] font-medium">{p.name}</p>
+                  <div className="relative aspect-square">
+                    <Image src={p.image} alt="" fill sizes="110px" className="object-cover" />
+                  </div>
+                  <p className="px-2.5 pb-2 text-[10px] font-medium">{p.name}</p>
                   {picked && (
                     <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-paper">
                       <Check size={10} />
