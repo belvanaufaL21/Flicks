@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { motion, useScroll, useTransform } from "motion/react";
 import { ArrowRight, ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
-import { Figure } from "./figure";
 
 const headline = ["Temukan", "warna", "&", "siluet", "yang", "paling"];
 const palette = ["#b5835a", "#8a9a5b", "#a26769", "#d4a373", "#6b7f6a"];
@@ -124,8 +124,18 @@ export function Hero() {
               className="relative mx-auto h-[540px] w-[270px] rounded-[46px] bg-ink p-3 shadow-[0_40px_80px_-30px_rgba(30,25,21,0.6)]"
             >
               <div className="absolute left-1/2 top-5 z-20 h-5 w-20 -translate-x-1/2 rounded-full bg-ink" />
-              <div className="relative h-full w-full overflow-hidden rounded-[36px] bg-gradient-to-b from-plum-soft via-paper to-sand/60">
-                <Figure top="#c0653f" bottom="#e8c8a0" className="absolute inset-x-6 bottom-10 top-16" />
+              <div className="relative h-full w-full overflow-hidden rounded-[36px] bg-[#e3cfb3]">
+                {/* Photo stops above the status pill so the shoes stay visible */}
+                <div className="absolute inset-x-0 top-0 bottom-12">
+                  <Image
+                    src="/images/model-before.webp"
+                    alt="Contoh foto pengguna berdiri menghadap kamera"
+                    fill
+                    priority
+                    sizes="246px"
+                    className="object-cover object-top"
+                  />
+                </div>
 
                 {/* corner brackets */}
                 {[

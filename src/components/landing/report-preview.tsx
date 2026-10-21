@@ -9,9 +9,9 @@ import {
   useMotionValue,
   useTransform,
 } from "motion/react";
+import Image from "next/image";
 import { Clock, Info, Lock } from "lucide-react";
 import { easeOut, Reveal } from "@/components/motion/reveal";
-import { Figure } from "./figure";
 import { SectionHeading } from "./section-heading";
 
 const tabs = [
@@ -319,17 +319,28 @@ function TryOnPanel() {
         }}
         onPointerMove={(e) => dragging && moveTo(e.clientX)}
         onPointerUp={() => setDragging(false)}
-        className="relative aspect-[4/5] cursor-ew-resize touch-none select-none overflow-hidden rounded-3xl bg-gradient-to-b from-plum-soft to-sand/50"
+        className="relative mx-auto aspect-[768/1376] w-full max-w-[340px] cursor-ew-resize touch-none select-none overflow-hidden rounded-3xl bg-sand"
       >
-        <Figure top="#cfc8bf" bottom="#4b4743" className="absolute inset-x-8 bottom-6 top-8" />
-        <span className="absolute left-4 top-4 rounded-full bg-paper/80 px-3 py-1 text-xs font-medium text-ink">
+        <Image
+          src="/images/model-before.webp"
+          alt="Contoh foto asli pengguna"
+          fill
+          sizes="340px"
+          draggable={false}
+          className="object-cover"
+        />
+        <span className="absolute left-4 top-4 z-10 rounded-full bg-paper/80 px-3 py-1 text-xs font-medium text-ink">
           Foto kamu
         </span>
-        <motion.div
-          style={{ clipPath: clip }}
-          className="absolute inset-0 bg-gradient-to-b from-sand/70 to-rose/40"
-        >
-          <Figure top="#a26769" bottom="#e8c8a0" className="absolute inset-x-8 bottom-6 top-8" />
+        <motion.div style={{ clipPath: clip }} className="absolute inset-0">
+          <Image
+            src="/images/model-after.webp"
+            alt="Contoh hasil virtual try-on dengan wrap blouse dusty rose"
+            fill
+            sizes="340px"
+            draggable={false}
+            className="object-cover"
+          />
           <span className="absolute right-4 top-4 rounded-full bg-ink px-3 py-1 text-xs font-medium text-paper">
             Hasil try-on
           </span>
