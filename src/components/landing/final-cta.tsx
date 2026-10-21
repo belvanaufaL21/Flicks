@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useScroll, useTransform } from "motion/react";
+import { motion, useMotionTemplate, useScroll, useTransform } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/motion/reveal";
+import { Magnetic } from "@/components/motion/shapes";
 import { brand } from "@/lib/brand";
 import { Logo } from "./navbar";
 
@@ -17,13 +18,17 @@ const orbs = [
 export function FinalCta() {
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const scale = useTransform(scrollYProgress, [0, 0.5], [0.92, 1]);
+  // A narrow arch that opens up into the full panel as it scrolls into view.
+  const side = useTransform(scrollYProgress, [0, 0.45], [22, 0]);
+  const top = useTransform(scrollYProgress, [0, 0.45], [8, 0]);
+  const arch = useTransform(scrollYProgress, [0, 0.45], [600, 40]);
+  const clipPath = useMotionTemplate`inset(${top}% ${side}% 0% ${side}% round ${arch}px ${arch}px 40px 40px)`;
 
   return (
     <section ref={ref} className="px-4 pb-10 sm:px-6">
       <motion.div
-        style={{ scale }}
-        className="relative mx-auto max-w-6xl overflow-hidden rounded-[40px] bg-ink px-6 py-24 text-center sm:py-32"
+        style={{ clipPath }}
+        className="relative mx-auto max-w-6xl overflow-hidden bg-ink px-6 py-24 text-center sm:py-32"
       >
         {orbs.map((o) => (
           <Orb key={o.color} {...o} progress={scrollYProgress} />
@@ -40,13 +45,15 @@ export function FinalCta() {
             </p>
           </Reveal>
           <Reveal delay={0.24}>
-            <a
-              href="#harga"
-              className="group mt-10 inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-accent-soft"
-            >
-              Mulai Analisis
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-            </a>
+            <Magnetic className="mt-10">
+              <a
+                href="#harga"
+                className="group inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-accent-soft"
+              >
+                Mulai Analisis
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+              </a>
+            </Magnetic>
           </Reveal>
         </div>
       </motion.div>

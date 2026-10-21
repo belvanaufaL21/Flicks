@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Plus } from "lucide-react";
-import { easeOut, fadeUp, Stagger } from "@/components/motion/reveal";
+import { easeOut, fadeUp, Reveal, Stagger } from "@/components/motion/reveal";
+import { MorphBlob, RotatingBadge } from "@/components/motion/shapes";
 import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
@@ -46,9 +47,32 @@ export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="mx-auto max-w-3xl px-4 py-24 sm:px-6 lg:py-32">
-      <SectionHeading eyebrow="FAQ" title="Pertanyaan yang sering muncul" />
-      <Stagger className="mt-14 divide-y divide-line border-y border-line">
+    <section
+      id="faq"
+      className="mx-auto grid max-w-6xl gap-14 px-4 py-24 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:py-32"
+    >
+      <div className="lg:sticky lg:top-32 lg:self-start">
+        <SectionHeading
+          align="left"
+          eyebrow="FAQ"
+          title={
+            <>
+              Pertanyaan yang <em className="text-accent">sering muncul</em>
+            </>
+          }
+          description="Belum menemukan jawabannya? Detail lengkap selalu ditampilkan sebelum kamu membayar."
+        />
+        {/* Arch window with a slowly spinning badge inside */}
+        <Reveal delay={0.2} className="relative mt-12 hidden h-72 w-56 overflow-hidden rounded-t-full bg-accent-soft lg:block">
+          <MorphBlob className="absolute -bottom-16 -left-10 h-64 w-64 text-line" />
+          <div className="absolute inset-0 flex items-center justify-center text-ink">
+            <RotatingBadge text="tanya apa saja • flicks lite • " size={132}>
+              <span className="font-display text-4xl italic text-accent-deep">?</span>
+            </RotatingBadge>
+          </div>
+        </Reveal>
+      </div>
+      <Stagger className="divide-y divide-line border-y border-line">
         {faqs.map((f, i) => {
           const isOpen = open === i;
           return (

@@ -2,9 +2,10 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import { motion, useScroll, useTransform } from "motion/react";
-import { ArrowRight, ScanLine } from "lucide-react";
+import { motion, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
+import { ArrowRight, ScanLine, Sparkles } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
+import { Magnetic, RotatingBadge } from "@/components/motion/shapes";
 
 const headline = ["Temukan", "warna", "&", "siluet", "yang", "paling"];
 const palette = ["#b5835a", "#8a9a5b", "#a26769", "#d4a373", "#6b7f6a"];
@@ -21,9 +22,30 @@ export function Hero() {
   const cardFastY = useTransform(scrollYProgress, [0, 1], [0, -180]);
   const cardSlowY = useTransform(scrollYProgress, [0, 1], [0, -70]);
   const blobScale = useTransform(scrollYProgress, [0, 1], [1, 1.35]);
+  const archY = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const outlineY = useTransform(scrollYProgress, [0, 1], [0, -40]);
+
+  // Pointer position (-0.5…0.5) drives a gentle 3D tilt of the phone.
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const tiltY = useSpring(useTransform(px, [-0.5, 0.5], [-10, 10]), { stiffness: 120, damping: 18 });
+  const tiltX = useSpring(useTransform(py, [-0.5, 0.5], [8, -8]), { stiffness: 120, damping: 18 });
 
   return (
-    <section ref={ref} className="relative overflow-hidden pt-32 pb-24 sm:pt-40 lg:pb-32">
+    <section
+      ref={ref}
+      onPointerMove={(e) => {
+        if (e.pointerType !== "mouse") return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        px.set((e.clientX - rect.left) / rect.width - 0.5);
+        py.set((e.clientY - rect.top) / rect.height - 0.5);
+      }}
+      onPointerLeave={() => {
+        px.set(0);
+        py.set(0);
+      }}
+      className="relative overflow-hidden pt-32 pb-24 sm:pt-40 lg:pb-32"
+    >
       <motion.div
         style={{ scale: blobScale }}
         className="pointer-events-none absolute -top-40 right-[-20%] h-[640px] w-[640px] rounded-full bg-gradient-to-br from-accent/25 via-line/60 to-transparent blur-3xl"
@@ -87,13 +109,15 @@ export function Hero() {
             transition={{ duration: 0.8, ease: easeOut, delay: 0.9 }}
             className="mt-9 flex flex-wrap items-center gap-3"
           >
-            <a
-              href="#harga"
-              className="group inline-flex items-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
-            >
-              Mulai Analisis
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-            </a>
+            <Magnetic>
+              <a
+                href="#harga"
+                className="group inline-flex items-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
+              >
+                Mulai Analisis
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+              </a>
+            </Magnetic>
             <a
               href="#cara-kerja"
               className="rounded-full border border-ink/15 px-7 py-4 text-sm font-medium text-ink transition-colors hover:border-ink/40"
@@ -116,7 +140,35 @@ export function Hero() {
 
         {/* Phone mockup */}
         <div className="relative mx-auto w-full max-w-[420px]">
-          <motion.div style={{ y: phoneY, rotate: phoneRotate }}>
+          {/* Arch backdrop: filled arch plus an offset outline, drifting apart on scroll */}
+          <motion.div
+            style={{ y: archY }}
+            initial={{ opacity: 0, scaleY: 0.6 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            transition={{ duration: 1.3, ease: easeOut, delay: 0.1 }}
+            className="absolute inset-x-6 -bottom-6 top-10 origin-bottom rounded-t-full bg-gradient-to-b from-accent-soft to-line/70 sm:inset-x-10"
+          />
+          <motion.div
+            style={{ y: outlineY }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.5, delay: 0.5 }}
+            className="absolute inset-x-2 -bottom-2 top-2 translate-x-4 rounded-t-full border border-accent/50 sm:inset-x-6"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.9, ease: easeOut, delay: 1.2 }}
+            className="absolute -bottom-10 right-0 z-10 rounded-full bg-ink text-paper shadow-xl sm:-right-6"
+          >
+            <RotatingBadge text="AI styling • personal color • try-on • " size={112}>
+              <Sparkles size={22} className="text-accent-light" />
+            </RotatingBadge>
+          </motion.div>
+
+          <motion.div
+            style={{ y: phoneY, rotate: phoneRotate, rotateX: tiltX, rotateY: tiltY, transformPerspective: 1000 }}
+          >
             <motion.div
               initial={{ opacity: 0, y: 60, rotate: 6 }}
               animate={{ opacity: 1, y: 0, rotate: 0 }}

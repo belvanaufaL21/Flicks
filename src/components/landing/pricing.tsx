@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Tag } from "lucide-react";
 import { easeOut, fadeUp, Reveal, Stagger } from "@/components/motion/reveal";
+import { Magnetic, RotatingBadge } from "@/components/motion/shapes";
 import { SectionHeading } from "./section-heading";
 
 const included = [
@@ -12,11 +13,15 @@ const included = [
   ["Laporan privat 72 jam", "Dikirim lewat tautan rahasia, tanpa perlu akun"],
 ];
 
+// Arch-topped like a boutique hang tag; inner radius is the outer minus the border.
+const outerShape = "rounded-t-[11rem] rounded-b-[2.25rem]";
+const innerShape = "rounded-t-[calc(11rem-1.5px)] rounded-b-[calc(2.25rem-1.5px)]";
+
 export function Pricing() {
   return (
     <section id="harga" className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <div className="grid items-center gap-14 lg:grid-cols-2">
-        <div>
+        <div className="relative">
           <SectionHeading
             align="left"
             eyebrow="Harga"
@@ -32,72 +37,98 @@ export function Pricing() {
               <motion.span
                 key={t}
                 variants={fadeUp}
+                whileHover={{ y: -3, rotate: -2 }}
                 className="rounded-full border border-line bg-paper px-4 py-2 text-sm text-ink"
               >
                 {t}
               </motion.span>
             ))}
           </Stagger>
+          <Reveal delay={0.2} className="mt-12 hidden text-ink lg:block">
+            <RotatingBadge text="sekali bayar • tanpa langganan • " size={128}>
+              <Tag size={24} className="text-accent" />
+            </RotatingBadge>
+          </Reveal>
         </div>
 
-        <Reveal y={60}>
+        <Reveal y={80} className="mx-auto w-full max-w-md">
+          {/* The whole tag sways gently from its string */}
           <motion.div
-            whileHover={{ y: -6 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            className="relative overflow-hidden rounded-[34px] p-[1.5px]"
+            animate={{ rotate: [-1.6, 1.6] }}
+            transition={{ duration: 3.2, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
+            whileHover={{ rotate: 0, y: -6 }}
+            style={{ transformOrigin: "50% -64px" }}
+            className="relative pt-16"
           >
-            {/* Slowly rotating gradient border */}
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 14, ease: "linear", repeat: Infinity }}
-              className="absolute -inset-[60%] bg-[conic-gradient(from_0deg,var(--color-accent-deep),var(--color-accent),var(--color-line),var(--color-cream),var(--color-accent),var(--color-accent-deep))]"
-            />
-            <div className="relative rounded-[33px] bg-paper p-8 sm:p-10">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-muted">Paket</p>
-                  <p className="mt-1 font-display text-3xl text-ink">1 Token FLICKS</p>
+            <svg
+              className="absolute left-1/2 top-0 h-[6.5rem] w-6 -translate-x-1/2"
+              viewBox="0 0 24 104"
+              aria-hidden="true"
+            >
+              <path d="M12 0 C 2 30, 22 60, 12 104" fill="none" stroke="currentColor" className="text-ink/35" strokeWidth="1.5" />
+            </svg>
+
+            <div className={`relative overflow-hidden p-[1.5px] ${outerShape}`}>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 14, ease: "linear", repeat: Infinity }}
+                className="absolute -inset-[60%] bg-[conic-gradient(from_0deg,var(--color-accent-deep),var(--color-accent),var(--color-line),var(--color-cream),var(--color-accent),var(--color-accent-deep))]"
+              />
+              <div className={`relative bg-paper px-8 pb-8 pt-16 sm:px-10 sm:pb-10 ${innerShape}`}>
+                {/* Punched hole */}
+                <span className="absolute left-1/2 top-8 h-5 w-5 -translate-x-1/2 rounded-full bg-cream shadow-[inset_0_2px_4px_rgba(37,34,31,0.25)] ring-1 ring-line" />
+
+                <div className="text-center">
+                  <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent-deep">
+                    Harga soft launch
+                  </span>
+                  <p className="mt-5 font-display text-3xl text-ink">1 Token FLICKS</p>
+                  <p className="mt-4 font-display text-7xl tracking-tight text-ink">Rp19.000</p>
+                  <p className="text-sm text-muted">per token · dibayar sekali</p>
                 </div>
-                <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent-deep">
-                  Harga soft launch
-                </span>
-              </div>
-              <p className="mt-8 flex items-baseline gap-2">
-                <span className="font-display text-7xl tracking-tight text-ink">Rp19.000</span>
-              </p>
-              <p className="text-sm text-muted">per token · dibayar sekali</p>
 
-              <ul className="mt-8 space-y-4">
-                {included.map(([title, body], i) => (
-                  <motion.li
-                    key={title}
-                    initial={{ opacity: 0, x: 16 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.15 + i * 0.08, ease: easeOut, duration: 0.6 }}
-                    className="flex gap-3"
+                <div className="my-8 border-t border-dashed border-line" />
+
+                <ul className="space-y-4">
+                  {included.map(([title, body], i) => (
+                    <motion.li
+                      key={title}
+                      initial={{ opacity: 0, x: 16 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.15 + i * 0.08, ease: easeOut, duration: 0.6 }}
+                      className="flex gap-3"
+                    >
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        whileInView={{ scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ type: "spring", stiffness: 300, damping: 14, delay: 0.3 + i * 0.08 }}
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-deep text-paper"
+                      >
+                        <Check size={14} />
+                      </motion.span>
+                      <span>
+                        <span className="block font-medium text-ink">{title}</span>
+                        <span className="text-sm text-muted">{body}</span>
+                      </span>
+                    </motion.li>
+                  ))}
+                </ul>
+
+                <Magnetic strength={0.15} className="mt-10 w-full">
+                  <a
+                    href="/analyze"
+                    className="group flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
                   >
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-deep text-paper">
-                      <Check size={14} />
-                    </span>
-                    <span>
-                      <span className="block font-medium text-ink">{title}</span>
-                      <span className="text-sm text-muted">{body}</span>
-                    </span>
-                  </motion.li>
-                ))}
-              </ul>
-
-              <a
-                href="/analyze"
-                className="group mt-10 flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-              >
-                Beli token & mulai
-                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-              </a>
-              <p className="mt-4 text-center text-xs text-muted">
-                Token diterbitkan setelah pembayaran terverifikasi. Hasil AI bersifat estimasi.
-              </p>
+                    Beli token & mulai
+                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                  </a>
+                </Magnetic>
+                <p className="mt-4 text-center text-xs text-muted">
+                  Token diterbitkan setelah pembayaran terverifikasi. Hasil AI bersifat estimasi.
+                </p>
+              </div>
             </div>
           </motion.div>
         </Reveal>

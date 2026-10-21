@@ -7,11 +7,13 @@ import {
   motion,
   useInView,
   useMotionValue,
+  useScroll,
   useTransform,
 } from "motion/react";
 import Image from "next/image";
 import { Clock, Info, Lock } from "lucide-react";
 import { easeOut, Reveal } from "@/components/motion/reveal";
+import { DomeSection } from "@/components/motion/shapes";
 import { brand } from "@/lib/brand";
 import { SectionHeading } from "./section-heading";
 
@@ -26,10 +28,32 @@ type TabId = (typeof tabs)[number]["id"];
 
 export function ReportPreview() {
   const [tab, setTab] = useState<TabId>("color");
+  const windowRef = useRef<HTMLDivElement>(null);
+
+  // The report window tilts up from the table to face the reader as it scrolls in.
+  const { scrollYProgress } = useScroll({ target: windowRef, offset: ["start end", "center center"] });
+  const rotateX = useTransform(scrollYProgress, [0, 1], [28, 0]);
+  const scale = useTransform(scrollYProgress, [0, 1], [0.88, 1]);
+  const arcRotate = useTransform(scrollYProgress, [0, 1], [-30, 0]);
 
   return (
-    <section id="hasil" className="relative overflow-hidden bg-paper py-24 lg:py-32">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+    <DomeSection id="hasil" className="bg-paper pt-32 pb-24 lg:pb-32">
+      {/* Concentric arches framing the report */}
+      <motion.div
+        style={{ rotate: arcRotate }}
+        className="pointer-events-none absolute left-1/2 top-[38%] h-[900px] w-[900px] -translate-x-1/2"
+        aria-hidden="true"
+      >
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="absolute rounded-full border border-accent/25"
+            style={{ inset: `${i * 90}px` }}
+          />
+        ))}
+      </motion.div>
+
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <SectionHeading
           eyebrow="Contoh hasil"
           title={
@@ -69,8 +93,12 @@ export function ReportPreview() {
           </div>
         </Reveal>
 
-        <Reveal delay={0.2} y={50} className="mx-auto mt-8 max-w-4xl">
-          <div className="overflow-hidden rounded-[32px] border border-line bg-cream/70 shadow-[0_40px_80px_-40px_rgba(37,34,31,0.35)]">
+        <motion.div
+          ref={windowRef}
+          style={{ rotateX, scale, transformPerspective: 1400 }}
+          className="mx-auto mt-8 max-w-4xl origin-bottom"
+        >
+          <div className="overflow-hidden rounded-[32px] border border-line bg-cream/90 shadow-[0_40px_80px_-40px_rgba(37,34,31,0.35)] backdrop-blur">
             <div className="flex items-center justify-between gap-4 border-b border-line bg-paper/80 px-6 py-4">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <Lock size={14} />
@@ -99,9 +127,9 @@ export function ReportPreview() {
           <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-muted">
             <Info size={14} /> Contoh ilustrasi, bukan hasil analisis nyata.
           </p>
-        </Reveal>
+        </motion.div>
       </div>
-    </section>
+    </DomeSection>
   );
 }
 
