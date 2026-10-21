@@ -8,7 +8,8 @@ import { easeOut } from "@/components/motion/reveal";
 import { Magnetic } from "@/components/motion/shapes";
 
 const headline = ["Temukan", "warna", "&", "siluet", "yang", "paling"];
-const palette = ["#b5835a", "#8a9a5b", "#a26769", "#d4a373", "#6b7f6a"];
+// Top of the Deep Autumn palette measured for the sample model (see report-preview.tsx).
+const palette = ["#9c4a2f", "#6b6b2e", "#4e3426", "#1f5a5a", "#6e2a2f"];
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
@@ -245,7 +246,7 @@ export function Hero() {
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                 Personal Color
               </p>
-              <p className="mt-1 font-display text-xl text-ink">Soft Autumn</p>
+              <p className="mt-1 font-display text-xl text-ink">Deep Autumn</p>
               <div className="mt-2 flex gap-1">
                 {palette.map((c) => (
                   <span key={c} className="h-4 w-4 rounded-full ring-2 ring-paper" style={{ background: c }} />
@@ -260,7 +261,7 @@ export function Hero() {
                 Body Shape
               </p>
               <p className="mt-1 font-display text-xl text-ink">Hourglass</p>
-              <p className="text-[11px] text-muted">Keyakinan: sedang</p>
+              <p className="text-[11px] text-muted">Keyakinan: rendah</p>
             </FloatCard>
           </motion.div>
 

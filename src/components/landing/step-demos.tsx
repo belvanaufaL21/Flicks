@@ -472,7 +472,8 @@ export function UploadDemo({ active }: DemoProps) {
 /* ---------- 3. AI reads color & body shape ---------- */
 
 const analyzeDurations = [2400, 2300, 2300, 3000] as const;
-const palette = ["#b5835a", "#8a9a5b", "#a26769", "#d4a373", "#6b7f6a"];
+// Top of the Deep Autumn palette measured for the sample model (see report-preview.tsx).
+const palette = ["#9c4a2f", "#6b6b2e", "#4e3426", "#1f5a5a", "#6e2a2f"];
 // Body landmarks as a share of photo height, with relative widths.
 const landmarks = [
   { name: "Bahu", top: "29%", width: "46%" },
@@ -558,9 +559,9 @@ export function AnalyzeDemo({ active }: DemoProps) {
             {phase === 3 && (
               <div className="divide-y divide-line">
                 {[
-                  ["Personal color", "Soft Autumn"],
-                  ["Body shape", "Hourglass"],
-                ].map(([k, v], i) => (
+                  ["Personal color", "Deep Autumn", "sedang"],
+                  ["Body shape", "Hourglass", "rendah"],
+                ].map(([k, v, c], i) => (
                   <motion.div
                     key={k}
                     initial={{ opacity: 0, x: 12 }}
@@ -572,7 +573,7 @@ export function AnalyzeDemo({ active }: DemoProps) {
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <p className="font-display text-lg leading-none">{v}</p>
                       <span className="shrink-0 whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[9px] font-medium text-accent-deep">
-                        keyakinan sedang
+                        keyakinan {c}
                       </span>
                     </div>
                   </motion.div>
@@ -739,7 +740,7 @@ export function ReportDemo({ active }: DemoProps) {
             >
               <div className="rounded-2xl bg-gradient-to-br from-accent-soft via-line to-accent/70 p-4">
                 <p className={label}>Estimasi season</p>
-                <p className="mt-1 font-display text-2xl">Soft Autumn</p>
+                <p className="mt-1 font-display text-2xl">Deep Autumn</p>
               </div>
               <div className="flex gap-1.5">
                 {palette.map((c) => (
