@@ -1,17 +1,24 @@
+import PhotoIntakeForm from "@/components/photo-intake/photo-intake-form";
 import Link from "next/link";
 
-// Placeholder until the checkout → upload flow (WEB-02 to WEB-08) is built.
 export default function AnalyzePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent-deep">Segera hadir</p>
-      <h1 className="mt-4 font-display text-5xl text-ink">Alur analisis sedang disiapkan</h1>
-      <p className="mt-4 max-w-md text-muted">
-        Checkout QRIS dan upload foto akan tersedia saat soft launch.
-      </p>
-      <Link href="/" className="mt-8 rounded-full bg-ink px-6 py-3 text-sm font-medium text-paper hover:bg-accent-deep">
-        Kembali ke beranda
-      </Link>
+    <main className="min-h-screen px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center text-xs font-semibold uppercase tracking-widest text-muted hover:text-ink transition-colors"
+          >
+            ← Kembali ke beranda
+          </Link>
+          <h1 className="mt-4 font-display text-4xl text-ink">Mulai Analisis & Virtual Try-On</h1>
+          <p className="mt-2 text-sm text-muted">
+            Selesaikan pembayaran QRIS Rp19.000 sekali bayar, unggah foto wajah & seluruh tubuh, dan terima laporan privat 72 jam.
+          </p>
+        </div>
+        <PhotoIntakeForm />
+      </div>
     </main>
   );
 }
