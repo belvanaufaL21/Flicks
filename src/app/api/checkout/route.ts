@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseMidtransService } from '@/server/payments/midtrans.service';
+import { enforceRateLimit } from '@/server/security/rate-limiter';
 
 function errorResponse(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
 }
 
-export async function POST() {
+export async function POST(request?: Request) {
+  const rateLimited = enforceRateLimit(request, 'checkout');
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
     !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||

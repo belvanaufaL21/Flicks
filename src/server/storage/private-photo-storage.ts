@@ -8,6 +8,7 @@ import type { ValidatedPhoto } from '@/server/photo/validate-photo';
 import { createSupabasePhotoRepository } from '@/server/storage/supabase-photo-repository';
 
 export const PRIVATE_PHOTO_BUCKET = 'flicks-private-photos';
+export const PHOTO_RETENTION_MS = 72 * 60 * 60 * 1000;
 
 export interface PhotoAsset {
   id: string;
@@ -30,6 +31,7 @@ export interface PhotoStorageRepository {
   createRecord(asset: PhotoAsset): Promise<void>;
   deleteObject(objectPath: string): Promise<void>;
   deleteRecord?(id: string): Promise<void>;
+  listExpired?(expiresBefore: string): Promise<PhotoAsset[]>;
   downloadObject?(objectPath: string): Promise<{
     bytes: Uint8Array;
     mimeType: PhotoAsset['mimeType'];
@@ -81,7 +83,7 @@ export function createPhotoStorageService(
         height: photo.height,
         createdAt: createdAt.toISOString(),
         expiresAt: new Date(
-          createdAt.getTime() + 72 * 60 * 60 * 1000,
+          createdAt.getTime() + PHOTO_RETENTION_MS,
         ).toISOString(),
       };
 

@@ -19,6 +19,10 @@ import {
 } from '@/server/dev/local-memory-store';
 import { getRequiredEnv } from '@/server/env';
 import {
+  recordOperationalEvent,
+  trackPaidExecutionAndDetectSpike,
+} from '@/server/monitoring/monitor';
+import {
   estimateGeminiCostIdr,
   GeminiProviderError,
   type GeminiUsageMetadata,
@@ -77,7 +81,7 @@ export interface AnalysisJobRepository {
     patch: Partial<
       Pick<
         AnalysisJobRecord,
-        'status' | 'result' | 'modelMetadata' | 'error' | 'updatedAt'
+        'status' | 'input' | 'result' | 'modelMetadata' | 'error' | 'updatedAt'
       >
     >,
   ): Promise<AnalysisJobRecord>;
@@ -340,22 +344,35 @@ export function createAnalysisService(
       }
 
       const existing = await repository.findByTokenId(input.tokenId);
-      if (existing) {
+      if (existing && existing.status !== 'failed') {
         return { ok: false, code: 'TOKEN_CONSUMED' };
       }
 
       const timestamp = now().toISOString();
       const trimmedBodyPath = input.fullBodyPhotoPath?.trim();
+      const nextInput = {
+        photo_path: trimmedPath,
+        ...(trimmedBodyPath ? { full_body_photo_path: trimmedBodyPath } : {}),
+        ...(input.gender ? { gender: input.gender } : {}),
+      };
+
+      if (existing && existing.status === 'failed') {
+        const retried = await repository.update(existing.id, {
+          status: 'queued',
+          input: nextInput,
+          result: null,
+          error: null,
+          updatedAt: timestamp,
+        });
+        return { ok: true, job: retried };
+      }
+
       const queuedJob: AnalysisJobRecord = {
         id: createId(),
         tokenId: input.tokenId,
         type: 'analysis',
         status: 'queued',
-        input: {
-          photo_path: trimmedPath,
-          ...(trimmedBodyPath ? { full_body_photo_path: trimmedBodyPath } : {}),
-          ...(input.gender ? { gender: input.gender } : {}),
-        },
+        input: nextInput,
         result: null,
         provider: 'gemini',
         modelMetadata: null,
@@ -391,6 +408,12 @@ export function createAnalysisService(
           existing.input.gender,
         );
         const timestamp = now().toISOString();
+        const totalCostIdr =
+          outcome.usageEvents?.reduce(
+            (sum, ev) => sum + ev.usage.estimatedCostIdr,
+            0,
+          ) ?? 0;
+        trackPaidExecutionAndDetectSpike('analysis', totalCostIdr);
 
         if (repository.recordUsageEvent && outcome.usageEvents) {
           for (const event of outcome.usageEvents) {
@@ -426,6 +449,15 @@ export function createAnalysisService(
             ? error.model
             : process.env.GEMINI_MODEL?.trim().replace(/^models\//i, '') ||
               'gemini-3.5-flash-lite';
+
+        recordOperationalEvent({
+          category: 'provider_job_failure',
+          severity: 'error',
+          code: errorCode,
+          message:
+            error instanceof Error ? error.message : 'Gemini analysis failed',
+          metadata: { provider: 'gemini', jobId, model },
+        });
 
         if (repository.recordUsageEvent) {
           await repository.recordUsageEvent({
@@ -604,6 +636,7 @@ export function createSupabaseAnalysisJobRepository(): AnalysisJobRepository {
         .from('jobs')
         .update({
           ...(patch.status ? { status: patch.status } : {}),
+          ...(patch.input ? { input: patch.input } : {}),
           ...(patch.result !== undefined ? { result: patch.result } : {}),
           ...(patch.modelMetadata !== undefined
             ? { model_metadata: patch.modelMetadata }

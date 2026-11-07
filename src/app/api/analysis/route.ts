@@ -4,6 +4,8 @@ import {
   canUseLocalDevFallback,
   isSupabaseConfigured,
 } from '@/server/dev/local-memory-store';
+import { enforcePaidWorkActive } from '@/server/security/kill-switch';
+import { enforceRateLimit } from '@/server/security/rate-limiter';
 import {
   createSupabaseTokenService,
   extractBearerToken,
@@ -14,6 +16,16 @@ function errorResponse(status: number, error: string, message: string) {
 }
 
 export async function POST(request: Request) {
+  const rateLimited = enforceRateLimit(request, 'analysis');
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const paused = await enforcePaidWorkActive();
+  if (paused) {
+    return paused;
+  }
+
   if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
     return errorResponse(
       503,
@@ -121,11 +133,16 @@ export async function POST(request: Request) {
           'Token has already been used for an analysis job',
         );
       }
+      await tokenService.releaseToken?.(reservation.token.id);
       return errorResponse(400, created.code, 'Invalid analysis request');
     }
 
     if (process.env.GEMINI_API_KEY?.trim()) {
-      await analysisService.processJob(created.job.id);
+      const processed = await analysisService.processJob(created.job.id);
+      if (processed?.status === 'failed') {
+        // Policy: release reserved token on provider failure so user can retry without paying again
+        await tokenService.releaseToken?.(reservation.token.id);
+      }
     }
 
     return NextResponse.json(
@@ -136,6 +153,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch {
+    await tokenService.releaseToken?.(reservation.token.id);
     return errorResponse(500, 'INTERNAL_ERROR', 'Failed to create analysis job');
   }
 }

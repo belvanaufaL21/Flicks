@@ -7,6 +7,10 @@ import {
 } from '@/server/dev/local-memory-store';
 import { getRequiredEnv } from '@/server/env';
 import {
+  recordOperationalEvent,
+  trackPaidExecutionAndDetectSpike,
+} from '@/server/monitoring/monitor';
+import {
   FASHN_CREDIT_COST_IDR,
   FASHN_ESTIMATED_COST_IDR,
   FashnProviderError,
@@ -205,6 +209,7 @@ export async function executeVtoPipeline(
       outcome.status === 'queued';
 
     if (isCompleted) {
+      trackPaidExecutionAndDetectSpike('virtual_try_on', FASHN_CREDIT_COST_IDR);
       return {
         ok: true,
         imageUri: outcome.resultImageUri ?? outcome.resultPath ?? undefined,
@@ -216,6 +221,13 @@ export async function executeVtoPipeline(
     if (isProcessing && outcome.providerReference) {
       const pollFn = provider.pollTryOn ?? provider.checkTryOnStatus;
       if (!pollFn) {
+        recordOperationalEvent({
+          category: 'provider_job_failure',
+          severity: 'error',
+          code: 'POLLING_UNSUPPORTED',
+          message: 'Polling not supported by FASHN provider',
+          metadata: { provider: 'fashn', category },
+        });
         return {
           ok: false,
           cost: outcome.costEstimateUsd ?? 0,
@@ -227,6 +239,10 @@ export async function executeVtoPipeline(
       const pollCompleted =
         polled.kind === 'completed' || polled.status === 'completed';
       if (pollCompleted) {
+        trackPaidExecutionAndDetectSpike(
+          'virtual_try_on',
+          FASHN_CREDIT_COST_IDR,
+        );
         return {
           ok: true,
           imageUri:
@@ -240,22 +256,38 @@ export async function executeVtoPipeline(
       }
       const pollFailed =
         polled.kind === 'failed' || polled.status === 'failed';
+      const pollError = pollFailed
+        ? (polled.errorMessage ?? polled.error ?? 'Render gagal diproses')
+        : 'Masih diproses';
+      recordOperationalEvent({
+        category: 'provider_job_failure',
+        severity: 'error',
+        code: pollFailed ? 'FASHN_POLL_FAILED' : 'FASHN_POLL_TIMEOUT',
+        message: pollError,
+        metadata: { provider: 'fashn', category },
+      });
       return {
         ok: false,
         cost: outcome.costEstimateUsd ?? 0,
         duration:
           (outcome.durationMs ?? 0) + (pollFailed ? (polled.durationMs ?? 0) : 0),
-        error: pollFailed
-          ? (polled.errorMessage ?? polled.error ?? 'Render gagal diproses')
-          : 'Masih diproses',
+        error: pollError,
       };
     }
 
+    const stepError = outcome.errorMessage ?? 'Render gagal diproses';
+    recordOperationalEvent({
+      category: 'provider_job_failure',
+      severity: 'error',
+      code: 'FASHN_SUBMIT_FAILED',
+      message: stepError,
+      metadata: { provider: 'fashn', category },
+    });
     return {
       ok: false,
       cost: 0,
       duration: outcome.durationMs ?? 0,
-      error: outcome.errorMessage ?? 'Render gagal diproses',
+      error: stepError,
     };
   };
 
@@ -777,6 +809,15 @@ export function createVirtualTryOnService(
       const timestamp = now().toISOString();
       const errorCode =
         error instanceof FashnProviderError ? error.code : 'PROVIDER_ERROR';
+
+      recordOperationalEvent({
+        category: 'provider_job_failure',
+        severity: 'error',
+        code: errorCode,
+        message:
+          error instanceof Error ? error.message : 'FASHN VTO job failed',
+        metadata: { provider: 'fashn', jobId },
+      });
 
       if (repository.recordUsageEvent) {
         await repository.recordUsageEvent({

@@ -3,6 +3,7 @@ import {
   canUseLocalDevFallback,
   isSupabaseConfigured,
 } from '@/server/dev/local-memory-store';
+import { enforceRateLimit } from '@/server/security/rate-limiter';
 import { PhotoStorageError } from '@/server/storage/private-photo-storage';
 import {
   createSupabaseTokenService,
@@ -16,6 +17,11 @@ function errorResponse(status: number, error: string, message: string) {
 }
 
 export async function POST(request: Request) {
+  const rateLimited = enforceRateLimit(request, 'upload');
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
     return errorResponse(
       503,

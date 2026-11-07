@@ -16,7 +16,15 @@ const ALLOWED_KINDS = new Set<ReportAssetKind>([
 ]);
 
 function errorResponse(status: number, error: string, message: string) {
-  return NextResponse.json({ error, message }, { status });
+  return NextResponse.json(
+    { error, message },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'private, no-store, max-age=0',
+      },
+    },
+  );
 }
 
 export async function GET(

@@ -86,6 +86,12 @@ interface StoredPhotoObject {
   record?: PhotoAsset;
 }
 
+export interface KillSwitchState {
+  paidWorkPaused: boolean;
+  reason: string | null;
+  updatedAt: string;
+}
+
 interface LocalDevMemoryState {
   tokensByHash: Map<string, TokenRecord>;
   photosByPath: Map<string, StoredPhotoObject>;
@@ -97,6 +103,9 @@ interface LocalDevMemoryState {
   adminProfilesByUserId: Map<string, AdminProfileRecord>;
   productsById: Map<string, CatalogProductRecord>;
   paymentsById: Map<string, unknown>;
+  systemSettings: {
+    killSwitch: KillSwitchState;
+  };
 }
 
 const globalForDevStore = globalThis as unknown as {
@@ -135,10 +144,26 @@ export function getLocalDevMemoryState(): LocalDevMemoryState {
       adminProfilesByUserId: new Map(),
       productsById,
       paymentsById: new Map(),
+      systemSettings: {
+        killSwitch: {
+          paidWorkPaused: false,
+          reason: null,
+          updatedAt: '2026-10-26T00:00:00.000Z',
+        },
+      },
     };
   }
   if (!globalForDevStore.__flicksLocalDevStore.vtoQuotas) {
     globalForDevStore.__flicksLocalDevStore.vtoQuotas = new Map();
+  }
+  if (!globalForDevStore.__flicksLocalDevStore.systemSettings) {
+    globalForDevStore.__flicksLocalDevStore.systemSettings = {
+      killSwitch: {
+        paidWorkPaused: false,
+        reason: null,
+        updatedAt: new Date().toISOString(),
+      },
+    };
   }
   return globalForDevStore.__flicksLocalDevStore;
 }
@@ -208,6 +233,27 @@ export function createInMemoryTokenRepository(): TokenRepository {
       }
       return null;
     },
+    async releaseById(tokenId, allowConsumed = false) {
+      for (const [hash, record] of state.tokensByHash.entries()) {
+        if (record.id === tokenId) {
+          if (
+            record.status === 'expired' ||
+            (record.status === 'consumed' && !allowConsumed)
+          ) {
+            return null;
+          }
+          const updated: TokenRecord = {
+            ...record,
+            status: 'available',
+            reservedAt: null,
+            consumedAt: null,
+          };
+          state.tokensByHash.set(hash, updated);
+          return updated;
+        }
+      }
+      return null;
+    },
   };
 }
 
@@ -234,6 +280,16 @@ export function createInMemoryPhotoRepository(): PhotoStorageRepository {
           state.photosByPath.delete(path);
         }
       }
+    },
+    async listExpired(expiresBefore) {
+      const cutoff = Date.parse(expiresBefore);
+      const expired: PhotoAsset[] = [];
+      for (const entry of state.photosByPath.values()) {
+        if (entry.record && Date.parse(entry.record.expiresAt) <= cutoff) {
+          expired.push(entry.record);
+        }
+      }
+      return expired;
     },
     async downloadObject(objectPath) {
       const entry = state.photosByPath.get(objectPath);

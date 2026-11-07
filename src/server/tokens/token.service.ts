@@ -6,6 +6,7 @@ import {
   createInMemoryTokenRepository,
 } from '@/server/dev/local-memory-store';
 import { getRequiredEnv } from '@/server/env';
+import { recordOperationalEvent } from '@/server/monitoring/monitor';
 
 export type TokenStatus = 'available' | 'reserved' | 'consumed' | 'expired';
 
@@ -35,6 +36,10 @@ export interface TokenRepository {
   ): Promise<TokenRecord | null>;
   consumeById?(tokenId: string, consumedAt: string): Promise<TokenRecord | null>;
   findByPaymentId?(paymentId: string): Promise<TokenRecord | null>;
+  releaseById?(
+    tokenId: string,
+    allowConsumed?: boolean,
+  ): Promise<TokenRecord | null>;
 }
 
 export interface TokenServiceOptions {
@@ -130,14 +135,35 @@ export function createTokenService(
       const secretHash = hashTokenSecret(normalized);
       const token = await repository.findBySecretHash(secretHash);
       if (!token) {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'warn',
+          code: 'TOKEN_INVALID_SECRET',
+          message: 'Verification attempted with unrecognized token secret',
+          metadata: { hashPrefix: secretHash.slice(0, 12) },
+        });
         return { ok: false, code: 'TOKEN_REQUIRED' };
       }
 
       if (token.status === 'consumed') {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'warn',
+          code: 'TOKEN_CONSUMED',
+          message: 'Verification attempted with already-consumed token',
+          metadata: { tokenId: token.id },
+        });
         return { ok: false, code: 'TOKEN_CONSUMED', token };
       }
 
       if (token.status === 'expired') {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'warn',
+          code: 'TOKEN_EXPIRED',
+          message: 'Verification attempted with expired token',
+          metadata: { tokenId: token.id },
+        });
         return { ok: false, code: 'TOKEN_EXPIRED' };
       }
 
@@ -173,13 +199,34 @@ export function createTokenService(
 
       const existing = await repository.findBySecretHash(secretHash);
       if (!existing) {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'warn',
+          code: 'TOKEN_INVALID_SECRET',
+          message: 'Reservation attempted with unrecognized token secret',
+          metadata: { hashPrefix: secretHash.slice(0, 12) },
+        });
         return { ok: false, code: 'TOKEN_REQUIRED' };
       }
 
       if (existing.status === 'expired') {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'warn',
+          code: 'TOKEN_EXPIRED',
+          message: 'Reservation attempted with expired token',
+          metadata: { tokenId: existing.id },
+        });
         return { ok: false, code: 'TOKEN_EXPIRED' };
       }
 
+      recordOperationalEvent({
+        category: 'token_misuse',
+        severity: 'warn',
+        code: 'TOKEN_CONSUMED',
+        message: 'Reservation attempted on non-reservable token',
+        metadata: { tokenId: existing.id, status: existing.status },
+      });
       return { ok: false, code: 'TOKEN_CONSUMED' };
     },
 
@@ -235,6 +282,33 @@ export function createTokenService(
         }
         throw error;
       }
+    },
+
+    async releaseToken(
+      tokenId: string,
+      options: { allowConsumed?: boolean } = {},
+    ): Promise<TokenRecord | null> {
+      const trimmedId = tokenId.trim();
+      if (!trimmedId || !repository.releaseById) {
+        return null;
+      }
+      const released = await repository.releaseById(
+        trimmedId,
+        Boolean(options.allowConsumed),
+      );
+      if (released) {
+        recordOperationalEvent({
+          category: 'token_misuse',
+          severity: 'info',
+          code: 'TOKEN_RECOVERED',
+          message: 'Token released back to available state under recovery policy',
+          metadata: {
+            tokenId: released.id,
+            forcedFromConsumed: Boolean(options.allowConsumed),
+          },
+        });
+      }
+      return released;
     },
   };
 }
@@ -393,6 +467,45 @@ export function createSupabaseTokenRepository(): TokenRepository {
           'id, secret_hash, status, payment_id, reserved_at, consumed_at, created_at',
         )
         .eq('payment_id', paymentId)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+      if (!data) {
+        return null;
+      }
+      if (!isTokenStatus(data.status)) {
+        throw new Error('Invalid stored token status');
+      }
+
+      return {
+        id: data.id,
+        secretHash: data.secret_hash,
+        status: data.status,
+        paymentId: data.payment_id,
+        reservedAt: data.reserved_at,
+        consumedAt: data.consumed_at,
+        createdAt: data.created_at,
+      };
+    },
+    async releaseById(tokenId, allowConsumed = false) {
+      const allowedStatuses: TokenStatus[] = allowConsumed
+        ? ['available', 'reserved', 'consumed']
+        : ['available', 'reserved'];
+
+      const { data, error } = await client
+        .from('tokens')
+        .update({
+          status: 'available',
+          reserved_at: null,
+          consumed_at: null,
+        })
+        .eq('id', tokenId)
+        .in('status', allowedStatuses)
+        .select(
+          'id, secret_hash, status, payment_id, reserved_at, consumed_at, created_at',
+        )
         .maybeSingle();
 
       if (error) {

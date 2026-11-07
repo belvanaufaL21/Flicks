@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { getRequiredEnv } from '@/server/env';
+import { recordOperationalEvent } from '@/server/monitoring/monitor';
 import {
   createSupabaseTokenService,
   type TokenRecord,
@@ -266,16 +267,37 @@ export function createMidtransService(
           signatureKey,
         })
       ) {
+        recordOperationalEvent({
+          category: 'payment_failure',
+          severity: 'warn',
+          code: 'INVALID_SIGNATURE',
+          message: 'Rejected Midtrans webhook with invalid signature',
+          metadata: { orderId },
+        });
         return { ok: false, code: 'INVALID_SIGNATURE' };
       }
 
       const existing = await repository.findByProviderReference(orderId);
       if (!existing) {
+        recordOperationalEvent({
+          category: 'payment_failure',
+          severity: 'warn',
+          code: 'PAYMENT_NOT_FOUND',
+          message: 'Midtrans webhook referenced unknown orderId',
+          metadata: { orderId },
+        });
         return { ok: false, code: 'PAYMENT_NOT_FOUND' };
       }
 
       const parsedAmount = Number(grossAmount);
       if (!Number.isFinite(parsedAmount) || parsedAmount !== existing.amount) {
+        recordOperationalEvent({
+          category: 'payment_failure',
+          severity: 'error',
+          code: 'INVALID_AMOUNT',
+          message: 'Midtrans webhook amount mismatch',
+          metadata: { orderId, expectedAmount: existing.amount },
+        });
         return { ok: false, code: 'INVALID_AMOUNT' };
       }
 
@@ -283,6 +305,16 @@ export function createMidtransService(
         notification.transaction_status,
         notification.fraud_status,
       );
+
+      if (nextStatus === 'failed' || nextStatus === 'expired') {
+        recordOperationalEvent({
+          category: 'payment_failure',
+          severity: 'warn',
+          code: `PAYMENT_${nextStatus.toUpperCase()}`,
+          message: `Payment transitioned to ${nextStatus}`,
+          metadata: { orderId, paymentId: existing.id, status: nextStatus },
+        });
+      }
 
       if (existing.status === 'paid' && nextStatus === 'paid') {
         const issued = await tokenIssuer.issuePaymentToken(existing.id);

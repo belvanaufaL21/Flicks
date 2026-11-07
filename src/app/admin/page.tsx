@@ -2,7 +2,10 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AdminDashboardView } from './admin-dashboard-view';
+import {
+  AdminDashboardView,
+  type KillSwitchViewState,
+} from './admin-dashboard-view';
 import type {
   AdminDashboardSummary,
   AdminJobItem,
@@ -52,6 +55,11 @@ export default function AdminDashboardPage() {
   const [tokens, setTokens] = useState<AdminTokenItem[]>([]);
   const [jobs, setJobs] = useState<AdminJobItem[]>([]);
   const [products, setProducts] = useState<CatalogProductRecord[]>([]);
+  const [killSwitch, setKillSwitch] = useState<KillSwitchViewState>({
+    paidWorkPaused: false,
+    reason: null,
+    updatedAt: '',
+  });
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     // ponytail: fallback to localStorage for tab/reload persistence in local dev. Upgrade path: Supabase onAuthStateChange.
@@ -65,11 +73,12 @@ export default function AdminDashboardPage() {
 
   const loadDashboardData = useCallback(async () => {
     const headers = getAuthHeaders();
-    const [summaryRes, txRes, jobsRes, prodRes] = await Promise.all([
+    const [summaryRes, txRes, jobsRes, prodRes, ksRes] = await Promise.all([
       fetch('/api/admin/summary', { headers }),
       fetch('/api/admin/transactions', { headers }),
       fetch('/api/admin/jobs', { headers }),
       fetch('/api/admin/products', { headers }),
+      fetch('/api/admin/system/kill-switch', { headers }),
     ]);
 
     if (summaryRes.status === 401 || summaryRes.status === 403) {
@@ -93,6 +102,10 @@ export default function AdminDashboardPage() {
     if (prodRes.ok) {
       const data = await prodRes.json();
       if (data.products) setProducts(data.products);
+    }
+    if (ksRes.ok) {
+      const data = await ksRes.json();
+      if (data.killSwitch) setKillSwitch(data.killSwitch);
     }
   }, [getAuthHeaders, router]);
 
@@ -172,6 +185,37 @@ export default function AdminDashboardPage() {
     };
   };
 
+  const handleToggleKillSwitch = async (nextPaused: boolean) => {
+    const res = await fetch('/api/admin/system/kill-switch', {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ paidWorkPaused: nextPaused }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.killSwitch) setKillSwitch(data.killSwitch);
+    }
+  };
+
+  const handleCleanupExpiredPhotos = async () => {
+    if (!window.confirm('Delete all expired private photos older than 72 hours?')) {
+      return;
+    }
+    const res = await fetch('/api/admin/system/cleanup-photos', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    return {
+      deletedCount: Number(data.deletedCount ?? 0),
+      failedCount: Number(data.failedCount ?? 0),
+    };
+  };
+
   return (
     <AdminDashboardView
       summary={summary}
@@ -179,6 +223,9 @@ export default function AdminDashboardPage() {
       tokens={tokens}
       jobs={jobs}
       products={products}
+      killSwitch={killSwitch}
+      onToggleKillSwitch={handleToggleKillSwitch}
+      onCleanupExpiredPhotos={handleCleanupExpiredPhotos}
       onCreateProduct={handleCreateProduct}
       onUpdateProduct={handleUpdateProduct}
       onDeleteProduct={handleDeleteProduct}

@@ -3,6 +3,8 @@ import {
   canUseLocalDevFallback,
   isSupabaseConfigured,
 } from '@/server/dev/local-memory-store';
+import { enforcePaidWorkActive } from '@/server/security/kill-switch';
+import { enforceRateLimit } from '@/server/security/rate-limiter';
 import {
   createSupabaseTokenService,
   extractBearerToken,
@@ -20,6 +22,16 @@ function errorResponse(status: number, error: string, message: string) {
 }
 
 export async function POST(request: Request) {
+  const rateLimited = enforceRateLimit(request, 'virtual_try_on');
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const paused = await enforcePaidWorkActive();
+  if (paused) {
+    return paused;
+  }
+
   if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
     return errorResponse(
       503,

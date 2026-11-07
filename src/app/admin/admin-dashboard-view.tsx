@@ -31,12 +31,24 @@ export type AdminTabKey =
 
 export type FinancialPeriodFilter = 'all' | 'today' | '7days' | 'thisMonth';
 
+export interface KillSwitchViewState {
+  paidWorkPaused: boolean;
+  reason: string | null;
+  updatedAt: string;
+}
+
 export interface AdminDashboardViewProps {
   summary: AdminDashboardSummary;
   transactions: AdminTransactionItem[];
   tokens: AdminTokenItem[];
   jobs: AdminJobItem[];
   products: CatalogProductRecord[];
+  killSwitch?: KillSwitchViewState;
+  onToggleKillSwitch?: (nextPaused: boolean) => void | Promise<void>;
+  onCleanupExpiredPhotos?: () =>
+    | { deletedCount: number; failedCount: number }
+    | void
+    | Promise<{ deletedCount: number; failedCount: number } | void>;
   onCreateProduct?: (input: CreateProductInput) => void | Promise<void>;
   onUpdateProduct?: (
     productId: string,
@@ -128,6 +140,9 @@ export function AdminDashboardView({
   tokens,
   jobs,
   products,
+  killSwitch,
+  onToggleKillSwitch,
+  onCleanupExpiredPhotos,
   onCreateProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -135,6 +150,7 @@ export function AdminDashboardView({
   onUploadPhoto,
 }: AdminDashboardViewProps) {
   const [activeTab, setActiveTab] = useState<AdminTabKey>('summary');
+  const [cleanupNotice, setCleanupNotice] = useState<string | null>(null);
   const [financialPeriod, setFinancialPeriod] =
     useState<FinancialPeriodFilter>('all');
   const [newName, setNewName] = useState('');
@@ -536,6 +552,82 @@ export function AdminDashboardView({
               Transactions, Token Lifecycle, AI/VTO Jobs, Product Catalog &amp;
               Usage Costs
             </p>
+          </div>
+
+          <div
+            role="region"
+            aria-label="Operator System Controls"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}
+          >
+            {killSwitch ? (
+              <>
+                <span
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    padding: '0.35rem 0.7rem',
+                    borderRadius: '999px',
+                    background: killSwitch.paidWorkPaused
+                      ? '#fee2e2'
+                      : '#dcfce7',
+                    color: killSwitch.paidWorkPaused ? '#991b1b' : '#166534',
+                  }}
+                >
+                  {killSwitch.paidWorkPaused
+                    ? 'AI Engine: Paused'
+                    : 'AI Engine: Active'}
+                </span>
+                {onToggleKillSwitch ? (
+                  <button
+                    type="button"
+                    className={styles.tabButton}
+                    style={{
+                      background: killSwitch.paidWorkPaused
+                        ? '#16a34a'
+                        : '#dc2626',
+                      color: '#ffffff',
+                      borderColor: killSwitch.paidWorkPaused
+                        ? '#16a34a'
+                        : '#dc2626',
+                    }}
+                    onClick={() =>
+                      void onToggleKillSwitch(!killSwitch.paidWorkPaused)
+                    }
+                  >
+                    {killSwitch.paidWorkPaused
+                      ? 'Resume Paid AI Work'
+                      : 'Pause Paid AI Work'}
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+
+            {onCleanupExpiredPhotos ? (
+              <button
+                type="button"
+                className={styles.tabButton}
+                onClick={async () => {
+                  const res = await onCleanupExpiredPhotos();
+                  if (res && typeof res.deletedCount === 'number') {
+                    setCleanupNotice(
+                      `Cleaned ${res.deletedCount} expired photo(s)`,
+                    );
+                  }
+                }}
+              >
+                Cleanup Expired Photos (&gt;72h)
+              </button>
+            ) : null}
+            {cleanupNotice ? (
+              <span style={{ fontSize: '0.82rem', color: '#475569' }}>
+                {cleanupNotice}
+              </span>
+            ) : null}
           </div>
         </header>
 

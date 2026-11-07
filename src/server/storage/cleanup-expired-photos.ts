@@ -1,4 +1,8 @@
 import 'server-only';
+import {
+  canUseLocalDevFallback,
+  createInMemoryPhotoRepository,
+} from '@/server/dev/local-memory-store';
 import { createSupabasePhotoRepository } from '@/server/storage/supabase-photo-repository';
 import type { PhotoAsset } from '@/server/storage/private-photo-storage';
 
@@ -58,6 +62,20 @@ export async function cleanupExpiredPhotos(
 }
 
 export function createSupabasePhotoCleanupService() {
+  if (canUseLocalDevFallback()) {
+    const inMemory = createInMemoryPhotoRepository();
+    const repository: PhotoCleanupRepository = {
+      listExpired: (expiresBefore) =>
+        inMemory.listExpired ? inMemory.listExpired(expiresBefore) : Promise.resolve([]),
+      deleteObject: (objectPath) => inMemory.deleteObject(objectPath),
+      deleteRecord: (id) =>
+        inMemory.deleteRecord ? inMemory.deleteRecord(id) : Promise.resolve(),
+    };
+    return {
+      run: () => cleanupExpiredPhotos(repository),
+    };
+  }
+
   const repository = createSupabasePhotoRepository();
 
   return {
