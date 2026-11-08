@@ -32,7 +32,7 @@ const points = [
   {
     icon: Server,
     title: "Pihak ketiga yang jelas",
-    body: "Foto diproses oleh Google Gemini (analisis warna & bentuk tubuh) dan FASHN (virtual try-on). Kami sebutkan sebelum kamu upload.",
+    body: "Foto diproses oleh Google Gemini melalui OpenRouter (analisis warna & bentuk tubuh) dan FASHN (virtual try-on). Kami sebutkan sebelum kamu upload.",
   },
   {
     icon: Timer,
@@ -274,7 +274,7 @@ function LockStage() {
 
 function ProviderStage() {
   const providers = [
-    { name: "Google Gemini", role: "Warna & bentuk tubuh", top: "22%" },
+    { name: "OpenRouter · Gemini", role: "Warna & bentuk tubuh", top: "22%" },
     { name: "FASHN", role: "Virtual try-on", top: "60%" },
   ];
   return (

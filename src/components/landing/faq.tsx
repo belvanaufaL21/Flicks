@@ -39,7 +39,7 @@ const faqs = [
   },
   {
     q: "Ke mana foto saya dikirim dan berapa lama disimpan?",
-    a: "Foto disimpan di storage privat dan diproses oleh Google Gemini serta FASHN API. Laporan kedaluwarsa setelah 72 jam dan foto dijadwalkan terhapus sesuai masa retensi.",
+    a: "Foto disimpan di storage privat, dianalisis oleh model Google Gemini melalui OpenRouter, dan diproses FASHN API untuk try-on. Laporan kedaluwarsa setelah 72 jam dan foto dijadwalkan terhapus sesuai masa retensi.",
   },
 ];
 
