@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Link from "next/link";
 import {
   motion,
   useMotionTemplate,
@@ -104,13 +105,13 @@ export function FinalCta() {
           </Reveal>
           <Reveal delay={0.24}>
             <Magnetic className="mt-10">
-              <a
-                href="#harga"
+              <Link
+                href="/analyze"
                 className="group pointer-events-auto inline-flex items-center gap-2 rounded-full bg-paper px-8 py-4 text-sm font-medium text-ink transition-colors hover:bg-accent-soft"
               >
                 Mulai analisis
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-              </a>
+              </Link>
             </Magnetic>
           </Reveal>
         </div>

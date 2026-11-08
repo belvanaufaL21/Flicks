@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
 import { ArrowRight, ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
@@ -126,15 +127,15 @@ export function Hero() {
             className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4 pl-10 sm:pl-11"
           >
             <Magnetic>
-              <a
-                href="#harga"
+              <Link
+                href="/analyze"
                 className="group inline-flex items-center gap-3 rounded-full bg-ink py-2 pl-6 pr-2 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
               >
                 Mulai analisis
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink transition-transform group-hover:translate-x-0.5">
                   <ArrowRight size={15} />
                 </span>
-              </a>
+              </Link>
             </Magnetic>
             <a
               href="#cara-kerja"

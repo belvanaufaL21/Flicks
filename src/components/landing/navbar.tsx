@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll, useSpring } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
@@ -70,12 +71,12 @@ export function Navbar() {
             ))}
           </ul>
           <div className="flex items-center gap-2">
-            <a
-              href="#harga"
+            <Link
+              href="/analyze"
               className="hidden rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent-deep sm:inline-block"
             >
               Mulai analisis
-            </a>
+            </Link>
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
@@ -115,13 +116,13 @@ export function Navbar() {
                   </motion.li>
                 ))}
               </ul>
-              <a
-                href="#harga"
+              <Link
+                href="/analyze"
                 onClick={() => setOpen(false)}
                 className="mt-2 block rounded-full bg-ink px-5 py-3 text-center text-sm font-medium text-paper"
               >
                 Mulai analisis
-              </a>
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>
