@@ -408,7 +408,7 @@ export function UploadDemo({ active }: DemoProps) {
         <Screen key="consent">
           <p className={label}>Persetujuan</p>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            Foto diproses oleh Google Gemini dan FASHN, disimpan privat, dan terhapus sesuai masa
+            Foto diproses oleh Google Gemini (via OpenRouter) dan FASHN, disimpan privat, dan terhapus sesuai masa
             retensi 72 jam.
           </p>
           <div className="relative mt-5 flex items-start gap-3 rounded-2xl border border-line p-3 text-xs">

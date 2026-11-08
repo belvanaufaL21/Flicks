@@ -1,12 +1,12 @@
 import { config } from "@/lib/config";
-import { analyzeBodyShape, analyzePersonalColor } from "@/lib/ai/gemini";
+import { analyzeBodyShape, analyzePersonalColor, type AnalysisOutput } from "@/lib/ai/analysis-ai";
 import { newId, newSecret, sha256 } from "@/lib/security";
 import { getStore } from "@/lib/store";
 import type { ImageInfo } from "@/lib/validation/image";
 import type { Analysis } from "@/types/domain";
 
 // Token policy for the analysis step (decision tracker #10, still to be locked):
-// the token is reserved while Gemini runs, released if the provider fails or the
+// the token is reserved while the analysis model runs, released if the provider fails or the
 // photos cannot support an estimate, and consumed only after the try-on is delivered.
 // A token allows this many analysis attempts before an admin has to look at it.
 export const MAX_ANALYSIS_ATTEMPTS = 3;
@@ -87,48 +87,62 @@ export async function startAnalysis(args: {
   return { analysis: { ...result.analysis, reportExpiresAt: expiresAt }, reportSecret };
 }
 
-/** Runs both Gemini modules. Called from `after()` so the request returns immediately. */
+/** Runs both analysis modules. Called from `after()` so the request returns immediately. */
 export async function runAnalysis(id: string) {
   const store = getStore();
   const analysis = await store.updateAnalysis(id, { status: "processing" });
   if (!analysis) return;
   const started = Date.now();
-  const provider = config.gemini.mode === "mock" ? "mock" : "gemini";
+  const provider = config.openrouter.mode === "mock" ? "mock" : "openrouter";
 
-  const log = (feature: "personal_color" | "body_shape", ok: boolean, detail: string | null) =>
-    store.logUsage({
+  // Logs the real charge OpenRouter reported. A call that failed outright reports
+  // no charge, so it is logged at 0 with the error as detail.
+  const log = (
+    feature: "personal_color" | "body_shape",
+    outcome: PromiseSettledResult<AnalysisOutput<unknown>>,
+  ) => {
+    const run = outcome.status === "fulfilled" ? outcome.value.run : null;
+    return store.logUsage({
       id: newId("use"),
       provider,
       feature,
       jobId: id,
-      estimatedCostIdr: provider === "mock" ? 0 : config.estimatedCostIdr.geminiPerModule,
-      status: ok ? "success" : "error",
-      detail,
+      estimatedCostIdr: Math.round((run?.costUsd ?? 0) * config.usdToIdr),
+      status: outcome.status === "fulfilled" ? "success" : "error",
+      detail:
+        outcome.status === "rejected"
+          ? String(outcome.reason)
+          : run && `${run.model} · in ${run.inputTokens ?? "?"} / out ${run.outputTokens ?? "?"} tok · ${run.attempts} attempt(s) · $${run.costUsd ?? "?"}`,
       timestamp: new Date().toISOString(),
     });
+  };
 
   try {
     const [face, body] = await Promise.all([store.photo(analysis.facePhotoId), store.photo(analysis.bodyPhotoId)]);
     if (!face || !body) throw new Error("Uploaded photos are missing.");
 
-    const [color, shape] = await Promise.allSettled([analyzePersonalColor(face), analyzeBodyShape(body)]);
-    await Promise.all([
-      log("personal_color", color.status === "fulfilled", color.status === "rejected" ? String(color.reason) : null),
-      log("body_shape", shape.status === "fulfilled", shape.status === "rejected" ? String(shape.reason) : null),
-    ]);
-    if (color.status === "rejected") throw color.reason;
-    if (shape.status === "rejected") throw shape.reason;
+    const [colorOut, shapeOut] = await Promise.allSettled([analyzePersonalColor(face), analyzeBodyShape(body)]);
+    await Promise.all([log("personal_color", colorOut), log("body_shape", shapeOut)]);
+    if (colorOut.status === "rejected") throw colorOut.reason;
+    if (shapeOut.status === "rejected") throw shapeOut.reason;
+    const color = colorOut.value.result;
+    const shape = shapeOut.value.result;
 
-    const metadata = { provider, model: config.gemini.model, durationMs: Date.now() - started } as const;
-    const unusable =
-      color.value.status === "insufficient_evidence" || shape.value.status === "insufficient_evidence";
+    const runs = [colorOut.value.run, shapeOut.value.run];
+    const metadata = {
+      provider,
+      model: runs[0]?.model ?? (provider === "mock" ? "mock" : config.openrouter.model),
+      durationMs: Date.now() - started,
+      costUsd: runs.every((r) => r?.costUsd != null) ? runs.reduce((sum, r) => sum + (r?.costUsd ?? 0), 0) : null,
+    } as const;
+    const unusable = color.status === "insufficient_evidence" || shape.status === "insufficient_evidence";
 
     if (unusable) {
       // Ask for new photos instead of charging for an estimate the photos cannot support.
       await store.updateAnalysis(id, {
         status: "needs_retake",
-        personalColor: color.value,
-        bodyShape: shape.value,
+        personalColor: color,
+        bodyShape: shape,
         modelMetadata: metadata,
       });
       await store.deletePhotos([analysis.facePhotoId, analysis.bodyPhotoId]);
@@ -138,8 +152,8 @@ export async function runAnalysis(id: string) {
 
     await store.updateAnalysis(id, {
       status: "completed",
-      personalColor: color.value,
-      bodyShape: shape.value,
+      personalColor: color,
+      bodyShape: shape,
       modelMetadata: metadata,
       completedAt: new Date().toISOString(),
       reportExpiresAt: new Date(Date.parse(analysis.createdAt) + config.reportTtlMs).toISOString(),

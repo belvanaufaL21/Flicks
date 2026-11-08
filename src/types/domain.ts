@@ -43,7 +43,7 @@ export type Analysis = {
   bodyPhotoId: string;
   personalColor: PersonalColorResult | null;
   bodyShape: BodyShapeResult | null;
-  modelMetadata: { provider: "gemini" | "mock"; model: string; durationMs: number } | null;
+  modelMetadata: { provider: "openrouter" | "mock"; model: string; durationMs: number; costUsd?: number | null } | null;
   error: string | null;
   /** SHA-256 of the report secret. The secret itself is never stored. */
   reportSecretHash: string;
@@ -95,7 +95,7 @@ export type Product = {
 
 export type UsageEvent = {
   id: string;
-  provider: "gemini" | "fashn" | "midtrans" | "mock";
+  provider: "openrouter" | "fashn" | "midtrans" | "mock";
   feature: "personal_color" | "body_shape" | "virtual_try_on" | "payment";
   jobId: string;
   estimatedCostIdr: number;

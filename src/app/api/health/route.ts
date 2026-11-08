@@ -8,7 +8,7 @@ export async function GET() {
   return json({
     status: "ok",
     paidFeaturesEnabled: config.paidFeaturesEnabled,
-    providers: { gemini: config.gemini.mode, fashn: config.fashn.mode, midtrans: config.midtrans.mode },
+    providers: { openrouter: config.openrouter.mode, fashn: config.fashn.mode, midtrans: config.midtrans.mode },
     store: getStore().kind,
   });
 }

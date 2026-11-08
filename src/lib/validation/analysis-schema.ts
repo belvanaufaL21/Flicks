@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// Structured output contracts for the two Gemini modules (PRD §F.1).
-// The same schemas are sent to Gemini as JSON Schema and used to validate its reply.
+// Structured output contracts for the two analysis modules (PRD §F.1).
+// The same schemas are sent to the model as JSON Schema and used to validate its reply.
 
 const status = z
   .enum(["completed", "needs_review", "insufficient_evidence"])

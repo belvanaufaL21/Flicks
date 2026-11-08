@@ -452,7 +452,7 @@ function UploadStep({ state, onSubmitted }: { state: FlowState; onSubmitted: () 
         <ul className="mt-3 space-y-1.5 text-sm text-muted">
           <li>Yang dikumpulkan: satu foto wajah dan satu foto seluruh badan.</li>
           <li>Tujuannya: estimasi personal color, body shape, dan satu simulasi virtual try-on.</li>
-          <li>Foto dikirim ke Google Gemini (analisis) dan FASHN (try-on) untuk diproses.</li>
+          <li>Foto dikirim melalui OpenRouter ke model Google Gemini (analisis), dan ke FASHN (try-on). Penyedia yang menyimpan data untuk pelatihan model tidak dipakai.</li>
           <li>Foto disimpan privat dan dihapus otomatis setelah 72 jam, bersama laporannya.</li>
           <li>Permintaan terkait data: hubungi tim FLICKS lewat kontak di halaman utama.</li>
         </ul>

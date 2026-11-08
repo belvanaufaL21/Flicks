@@ -41,12 +41,20 @@ export const config = {
   priceIdr: 19_000,
   reportTtlMs: 72 * 60 * 60 * 1000,
 
-  gemini: {
+  // Analysis model via OpenRouter. Gemini 3.8 Flash: strong image understanding,
+  // JSON-schema output, mid-range price. The fallback is another Google model so the
+  // photos stay with the processors named in the privacy notice.
+  openrouter: {
     get mode() {
-      return providerMode(env.GEMINI_API_KEY);
+      return providerMode(env.OPENROUTER_API_KEY?.trim());
     },
-    apiKey: env.GEMINI_API_KEY,
-    model: env.GEMINI_MODEL || "gemini-2.5-flash",
+    apiKey: env.OPENROUTER_API_KEY?.trim(),
+    baseUrl: "https://openrouter.ai/api/v1",
+    model: env.OPENROUTER_MODEL?.trim() || "google/gemini-3.8-flash",
+    fallbackModels: (env.OPENROUTER_FALLBACK_MODELS ?? "google/gemini-3.7-flash")
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean),
     maxAttempts: 2,
   },
 
@@ -75,9 +83,10 @@ export const config = {
   // development; production must set a fixed value so URLs survive restarts.
   mediaSigningSecret: env.MEDIA_SIGNING_SECRET ?? (isProduction ? undefined : devFallbackSecret()),
 
-  // Planning estimates from PRD §I, logged per call until real invoices are in.
+  // Analysis cost comes from OpenRouter's reported charge per call. FASHN still uses
+  // the PRD §I planning estimate until real invoices are in.
+  usdToIdr: Number(env.USD_TO_IDR) || 18_000,
   estimatedCostIdr: {
-    geminiPerModule: 99,
     fashnPerOutput: 1_350,
   },
 };
@@ -89,6 +98,6 @@ export function requireMediaSecret(): string {
 
 export function isDemoMode() {
   return (
-    config.gemini.mode === "mock" || config.fashn.mode === "mock" || config.midtrans.mode === "mock"
+    config.openrouter.mode === "mock" || config.fashn.mode === "mock" || config.midtrans.mode === "mock"
   );
 }

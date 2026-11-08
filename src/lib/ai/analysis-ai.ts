@@ -1,6 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { config } from "@/lib/config";
+import { ProviderError } from "./errors";
+import { chatJson, type ModelRun } from "./openrouter";
 import {
   bodyShapeSchema,
   normalizeBodyShape,
@@ -10,8 +11,8 @@ import {
   type PersonalColorResult,
 } from "@/lib/validation/analysis-schema";
 
-// Gemini runs the two analysis modules (PRD §F.1). It never generates try-on images:
-// that is FASHN's job alone.
+// The two analysis modules (PRD §F.1), run on a Gemini vision model through
+// OpenRouter. This never generates try-on images: that is FASHN's job alone.
 
 type ImageInput = { bytes: Uint8Array; mime: string };
 
@@ -19,7 +20,7 @@ const DISCLAIMER =
   "Estimasi berbasis foto. Hasil dipengaruhi pencahayaan, kamera, pose, dan pakaian. Bukan diagnosis atau pengukuran profesional.";
 
 const SHARED_RULES = `
-Kamu adalah asisten styling untuk pengguna di Indonesia. Tulis semua teks untuk pengguna dalam Bahasa Indonesia yang ramah dan ringkas.
+Kamu adalah asisten styling untuk pengguna di Indonesia. Tulis semua teks untuk pengguna dalam Bahasa Indonesia yang ramah dan ringkas, dan sapa pengguna dengan "kamu" (bukan "Anda").
 Aturan:
 - Ini estimasi dari foto, bukan diagnosis. Jangan pernah mengklaim akurasi profesional.
 - Nilai dulu kualitas foto. Jika foto gelap, buram, berfilter, terpotong, atau bukan foto orang, pakai status "insufficient_evidence" atau "needs_review" dan jelaskan masalahnya di photo_quality.issues.
@@ -42,60 +43,40 @@ Tugas: estimasi kategori bentuk tubuh dari foto seluruh badan ini.
 - Bila tubuh tidak terlihat utuh dari bahu sampai kaki, atau pakaian terlalu longgar untuk melihat siluet, gunakan status "needs_review" atau "insufficient_evidence".
 - styling: siluet dan potongan pakaian yang patut dicoba secara umum, dengan bahasa netral dan positif.`;
 
-export class ProviderError extends Error {
-  constructor(message: string, readonly retryable: boolean) {
-    super(message);
-  }
-}
+export type AnalysisOutput<T> = { result: T; run: ModelRun | null };
 
-let client: GoogleGenAI | null = null;
-function gemini() {
-  client ??= new GoogleGenAI({ apiKey: config.gemini.apiKey });
-  return client;
-}
-
-async function runModule<T>(prompt: string, image: ImageInput, schema: z.ZodType<T>): Promise<T> {
+/** Calls the model, validates the reply against the schema, and retries a limited number of times. */
+async function runModule<T>(name: string, prompt: string, image: ImageInput, schema: z.ZodType<T>) {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
   let lastError: unknown;
-  for (let attempt = 1; attempt <= config.gemini.maxAttempts; attempt++) {
+  let spentUsd = 0;
+  for (let attempt = 1; attempt <= config.openrouter.maxAttempts; attempt++) {
     try {
-      const response = await gemini().models.generateContent({
-        model: config.gemini.model,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { inlineData: { mimeType: image.mime, data: Buffer.from(image.bytes).toString("base64") } },
-              { text: prompt },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseJsonSchema: z.toJSONSchema(schema),
-          temperature: 0.2,
-          abortSignal: AbortSignal.timeout(60_000),
-        },
-      });
-      const parsed = schema.safeParse(JSON.parse(response.text ?? ""));
-      if (parsed.success) return parsed.data;
-      lastError = new ProviderError(`Gemini output failed schema validation: ${parsed.error.message}`, true);
+      const { content, run } = await chatJson({ prompt, image, schemaName: name, schema: jsonSchema });
+      spentUsd += run.costUsd ?? 0;
+      const parsed = schema.safeParse(JSON.parse(content));
+      if (parsed.success) return { result: parsed.data, run: { ...run, costUsd: spentUsd, attempts: attempt } };
+      lastError = new ProviderError(`${name} output failed schema validation: ${parsed.error.message}`, true);
     } catch (err) {
       lastError = err;
+      if (err instanceof ProviderError && !err.retryable) break;
     }
   }
   throw lastError instanceof ProviderError
     ? lastError
-    : new ProviderError(`Gemini request failed: ${String(lastError)}`, true);
+    : new ProviderError(`${name} request failed: ${String(lastError)}`, true);
 }
 
-export async function analyzePersonalColor(face: ImageInput): Promise<PersonalColorResult> {
-  if (config.gemini.mode === "mock") return mockPersonalColor();
-  return normalizePersonalColor(await runModule(PERSONAL_COLOR_PROMPT, face, personalColorSchema));
+export async function analyzePersonalColor(face: ImageInput): Promise<AnalysisOutput<PersonalColorResult>> {
+  if (config.openrouter.mode === "mock") return { result: await mockPersonalColor(), run: null };
+  const out = await runModule("personal_color", PERSONAL_COLOR_PROMPT, face, personalColorSchema);
+  return { result: normalizePersonalColor(out.result), run: out.run };
 }
 
-export async function analyzeBodyShape(body: ImageInput): Promise<BodyShapeResult> {
-  if (config.gemini.mode === "mock") return mockBodyShape();
-  return normalizeBodyShape(await runModule(BODY_SHAPE_PROMPT, body, bodyShapeSchema));
+export async function analyzeBodyShape(body: ImageInput): Promise<AnalysisOutput<BodyShapeResult>> {
+  if (config.openrouter.mode === "mock") return { result: await mockBodyShape(), run: null };
+  const out = await runModule("body_shape", BODY_SHAPE_PROMPT, body, bodyShapeSchema);
+  return { result: normalizeBodyShape(out.result), run: out.run };
 }
 
 // Demo results so the whole flow can be exercised without an API key. They are

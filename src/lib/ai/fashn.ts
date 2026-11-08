@@ -1,5 +1,5 @@
 import { config } from "@/lib/config";
-import { ProviderError } from "./gemini";
+import { ProviderError } from "./errors";
 
 // FASHN handles virtual try-on only (PRD §F.2). The backend submits a job, records
 // FASHN's job id, then polls FASHN's status endpoint whenever the client asks.
