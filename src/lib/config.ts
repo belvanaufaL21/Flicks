@@ -6,16 +6,18 @@ const isProduction = env.NODE_ENV === "production";
 
 // FLICKS_MOCK=1 forces every provider into demo mode. Otherwise a provider runs
 // in demo mode only when its key is missing, and never in production, where a
-// missing key is a configuration error rather than a reason to fake results.
+// missing key is a configuration gap rather than a reason to fake results (a
+// simulated payment there would hand out free tokens). In production a provider
+// without a key is "missing": the site keeps working and only the feature that
+// needs it is refused with a clear message.
 const forceMock = env.FLICKS_MOCK === "1";
 
-function providerMode(key: string | undefined): "live" | "mock" {
+export type ProviderMode = "live" | "mock" | "missing";
+
+function providerMode(key: string | undefined): ProviderMode {
   if (forceMock) return "mock";
   if (key) return "live";
-  if (isProduction) {
-    throw new Error("Provider API key is missing in production. Set it or set FLICKS_MOCK=1.");
-  }
-  return "mock";
+  return isProduction ? "missing" : "mock";
 }
 
 // Pages and route handlers load separate copies of this module, so the fallback must
@@ -94,6 +96,14 @@ export const config = {
 export function requireMediaSecret(): string {
   if (!config.mediaSigningSecret) throw new Error("MEDIA_SIGNING_SECRET is not set.");
   return config.mediaSigningSecret;
+}
+
+/** Providers that have no key in production. Non-empty means the package cannot be sold. */
+export function missingProviders() {
+  const all = { OpenRouter: config.openrouter.mode, FASHN: config.fashn.mode, Midtrans: config.midtrans.mode };
+  return Object.entries(all)
+    .filter(([, mode]) => mode === "missing")
+    .map(([name]) => name);
 }
 
 export function isDemoMode() {

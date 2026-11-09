@@ -39,6 +39,9 @@ export async function startAnalysis(args: {
   body: UploadedPhoto;
 }): Promise<{ analysis: Analysis; reportSecret: string | null }> {
   if (!config.paidFeaturesEnabled) throw new FlowError("Layanan analisis sedang dihentikan sementara.", 503);
+  if (config.openrouter.mode === "missing") {
+    throw new FlowError("Layanan analisis belum tersedia. Token kamu tidak terpakai.", 503);
+  }
   const store = getStore();
 
   // Cheap check first, so an obviously refused request uploads nothing. The atomic

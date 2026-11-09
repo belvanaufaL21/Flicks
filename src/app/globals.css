@@ -24,6 +24,15 @@ html {
   scroll-behavior: smooth;
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* Lenis animates the scroll itself; native smooth scrolling would fight it. */
 @media (prefers-reduced-motion: reduce) {
   html {

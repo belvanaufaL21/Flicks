@@ -1,4 +1,4 @@
-import { config, isDemoMode } from "@/lib/config";
+import { config, isDemoMode, missingProviders } from "@/lib/config";
 import { getStore } from "@/lib/store";
 import { refreshPayment } from "./payment.service";
 import { refreshTryon } from "./tryon.service";
@@ -12,7 +12,8 @@ export async function getFlowState(sessionHash: string | null, reportSecret: str
   const store = getStore();
   const base = {
     demo: isDemoMode(),
-    paidFeaturesEnabled: config.paidFeaturesEnabled,
+    // Sales are open only when the kill-switch is off and every provider has a key.
+    paidFeaturesEnabled: config.paidFeaturesEnabled && missingProviders().length === 0,
     priceIdr: config.priceIdr,
   };
   const first = sessionHash ? await store.latestPaymentForSession(sessionHash) : null;

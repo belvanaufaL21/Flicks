@@ -3,10 +3,10 @@ import { config } from "@/lib/config";
 import { ProviderError } from "./errors";
 import { chatJson, type ModelRun } from "./openrouter";
 import {
-  bodyShapeSchema,
+  bodyShapeModelSchema,
   normalizeBodyShape,
   normalizePersonalColor,
-  personalColorSchema,
+  personalColorModelSchema,
   type BodyShapeResult,
   type PersonalColorResult,
 } from "@/lib/validation/analysis-schema";
@@ -47,7 +47,8 @@ export type AnalysisOutput<T> = { result: T; run: ModelRun | null };
 
 /** Calls the model, validates the reply against the schema, and retries a limited number of times. */
 async function runModule<T>(name: string, prompt: string, image: ImageInput, schema: z.ZodType<T>) {
-  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  // "input" describes what the model must send (before trims and hex normalising).
+  const jsonSchema = z.toJSONSchema(schema, { io: "input" }) as Record<string, unknown>;
   let lastError: unknown;
   let spentUsd = 0;
   for (let attempt = 1; attempt <= config.openrouter.maxAttempts; attempt++) {
@@ -56,7 +57,9 @@ async function runModule<T>(name: string, prompt: string, image: ImageInput, sch
       spentUsd += run.costUsd ?? 0;
       const parsed = schema.safeParse(JSON.parse(content));
       if (parsed.success) return { result: parsed.data, run: { ...run, costUsd: spentUsd, attempts: attempt } };
-      lastError = new ProviderError(`${name} output failed schema validation: ${parsed.error.message}`, true);
+      const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      console.warn(`[${name}] attempt ${attempt} rejected by schema: ${issues}`);
+      lastError = new ProviderError(`${name} output failed schema validation: ${issues}`, true);
     } catch (err) {
       lastError = err;
       if (err instanceof ProviderError && !err.retryable) break;
@@ -69,14 +72,14 @@ async function runModule<T>(name: string, prompt: string, image: ImageInput, sch
 
 export async function analyzePersonalColor(face: ImageInput): Promise<AnalysisOutput<PersonalColorResult>> {
   if (config.openrouter.mode === "mock") return { result: await mockPersonalColor(), run: null };
-  const out = await runModule("personal_color", PERSONAL_COLOR_PROMPT, face, personalColorSchema);
-  return { result: normalizePersonalColor(out.result), run: out.run };
+  const out = await runModule("personal_color", PERSONAL_COLOR_PROMPT, face, personalColorModelSchema);
+  return { result: normalizePersonalColor({ ...out.result, analysis_type: "personal_color" }), run: out.run };
 }
 
 export async function analyzeBodyShape(body: ImageInput): Promise<AnalysisOutput<BodyShapeResult>> {
   if (config.openrouter.mode === "mock") return { result: await mockBodyShape(), run: null };
-  const out = await runModule("body_shape", BODY_SHAPE_PROMPT, body, bodyShapeSchema);
-  return { result: normalizeBodyShape(out.result), run: out.run };
+  const out = await runModule("body_shape", BODY_SHAPE_PROMPT, body, bodyShapeModelSchema);
+  return { result: normalizeBodyShape({ ...out.result, analysis_type: "body_shape" }), run: out.run };
 }
 
 // Demo results so the whole flow can be exercised without an API key. They are

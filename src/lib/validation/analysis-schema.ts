@@ -11,8 +11,22 @@ const status = z
 const confidence = z.enum(["low", "medium", "high"]);
 const color = z.object({
   name: z.string().describe("Color name in Indonesian, e.g. 'Hijau zaitun'"),
-  hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  // Accepts "a1b2c3" or "#a1b2c3" and stores "#A1B2C3".
+  hex: z
+    .string()
+    .regex(/^#?[0-9A-Fa-f]{6}$/)
+    .describe("Six-digit hex color, e.g. #6B6B2E")
+    .transform((h) => `#${h.replace("#", "").toUpperCase()}`),
 });
+
+// A list that keeps at most `max` items. The model is told the limit; one extra item
+// is trimmed instead of failing the whole (paid) analysis.
+function list<T extends z.ZodType>(item: T, max: number) {
+  return z
+    .array(item)
+    .describe(`At most ${max} items.`)
+    .transform((items) => items.slice(0, max));
+}
 
 export const SEASONS = ["spring", "summer", "autumn", "winter"] as const;
 export const SUB_SEASONS = [
@@ -30,17 +44,17 @@ export const SUB_SEASONS = [
   "bright_winter",
 ] as const;
 
-export const personalColorSchema = z.object({
-  analysis_type: z.literal("personal_color"),
+// The model's reply. `analysis_type` is deliberately not part of it: it is a constant
+// we already know, and asking for it only gave the model a field to get wrong (it
+// failed validation on most first attempts). It is added after validation instead.
+export const personalColorModelSchema = z.object({
   status,
   primary_season: z.enum([...SEASONS, "unknown"]),
   sub_season: z
     .enum(SUB_SEASONS)
     .nullable()
     .describe("Only when the photo clearly supports it. Otherwise null; never force a sub-season."),
-  alternative_candidates: z
-    .array(z.object({ season: z.enum(SEASONS), reason: z.string() }))
-    .max(2),
+  alternative_candidates: list(z.object({ season: z.enum(SEASONS), reason: z.string() }), 2),
   confidence_level: confidence,
   traits: z.object({
     undertone: z.enum(["warm", "cool", "neutral", "uncertain"]),
@@ -53,9 +67,9 @@ export const personalColorSchema = z.object({
     issues: z.array(z.string()).describe("Problems found, in Indonesian. Empty when none."),
   }),
   styling: z.object({
-    recommended_colors: z.array(color).max(8),
-    colors_to_test: z.array(color).max(4),
-    colors_to_avoid: z.array(color).max(4),
+    recommended_colors: list(color, 8),
+    colors_to_test: list(color, 4),
+    colors_to_avoid: list(color, 4),
   }),
   summary: z.string().describe("Two or three sentences in Indonesian for the user."),
   disclaimer: z.string(),
@@ -63,13 +77,10 @@ export const personalColorSchema = z.object({
 
 export const BODY_SHAPES = ["rectangle", "pear", "hourglass", "inverted_triangle"] as const;
 
-export const bodyShapeSchema = z.object({
-  analysis_type: z.literal("body_shape"),
+export const bodyShapeModelSchema = z.object({
   status,
   shape: z.enum([...BODY_SHAPES, "unknown"]),
-  alternative_candidates: z
-    .array(z.object({ shape: z.enum(BODY_SHAPES), reason: z.string() }))
-    .max(2),
+  alternative_candidates: list(z.object({ shape: z.enum(BODY_SHAPES), reason: z.string() }), 2),
   confidence_level: confidence,
   photo_quality: z.object({
     full_body_visible: z.boolean(),
@@ -78,16 +89,20 @@ export const bodyShapeSchema = z.object({
     issues: z.array(z.string()),
   }),
   styling: z.object({
-    silhouettes_to_try: z.array(z.string()).max(5),
-    fits_to_try: z.array(z.string()).max(5),
-    things_to_consider: z.array(z.string()).max(4),
+    silhouettes_to_try: list(z.string(), 5),
+    fits_to_try: list(z.string(), 5),
+    things_to_consider: list(z.string(), 4),
   }),
   summary: z.string().describe("Two or three sentences in Indonesian for the user."),
   disclaimer: z.string(),
 });
 
-export type PersonalColorResult = z.infer<typeof personalColorSchema>;
-export type BodyShapeResult = z.infer<typeof bodyShapeSchema>;
+// Stored results: the model's reply plus the constant type tag.
+export const personalColorSchema = personalColorModelSchema.extend({ analysis_type: z.literal("personal_color") });
+export const bodyShapeSchema = bodyShapeModelSchema.extend({ analysis_type: z.literal("body_shape") });
+
+export type PersonalColorResult = z.output<typeof personalColorSchema>;
+export type BodyShapeResult = z.output<typeof bodyShapeSchema>;
 
 // Rules the model is told but not trusted to follow: enforce them after parsing.
 export function normalizePersonalColor(r: PersonalColorResult): PersonalColorResult {

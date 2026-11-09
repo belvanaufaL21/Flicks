@@ -53,9 +53,9 @@ export function Navbar() {
         className="fixed inset-x-0 top-0 z-50 px-4 pt-3 sm:px-6"
       >
         <nav
-          className={`mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-3 transition-[background-color,box-shadow,backdrop-filter] duration-500 ${
+          className={`mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-3 transition-[background-color,box-shadow] duration-500 ${
             scrolled || open
-              ? "bg-paper/80 shadow-[0_8px_30px_-12px_rgba(37,34,31,0.25)] backdrop-blur-xl"
+              ? "bg-paper/90 shadow-[0_8px_30px_-12px_rgba(37,34,31,0.25)] backdrop-blur-md"
               : "bg-transparent"
           }`}
         >
@@ -96,7 +96,7 @@ export function Navbar() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12, scale: 0.98 }}
               transition={{ duration: 0.3, ease: easeOut }}
-              className="mx-auto mt-2 max-w-6xl rounded-3xl bg-paper/95 p-4 shadow-xl backdrop-blur-xl md:hidden"
+              className="mx-auto mt-2 max-w-6xl rounded-3xl bg-paper p-4 shadow-xl md:hidden"
             >
               <ul className="flex flex-col">
                 {links.map((l, i) => (

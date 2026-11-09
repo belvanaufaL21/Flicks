@@ -333,7 +333,7 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
               Bayar {rupiah(state.priceIdr)} dengan QRIS <ArrowRight size={16} />
             </PrimaryButton>
             {!state.paidFeaturesEnabled && (
-              <p className="mt-3 text-sm text-red-900">Pembelian sedang dihentikan sementara.</p>
+              <p className="mt-3 text-sm text-red-900">Pembelian sedang tidak tersedia. Coba lagi nanti.</p>
             )}
           </div>
         )}
@@ -592,7 +592,7 @@ function ProductStep({ state, onSubmitted }: { state: FlowState; onSubmitted: ()
               }`}
             >
               <div className="relative aspect-[3/4] bg-cream">
-                <Image src={p.image} alt={p.name} fill sizes="(min-width: 640px) 25vw, 50vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                <Image src={p.image} alt={p.name} fill loading="eager" sizes="(min-width: 640px) 25vw, 50vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                 {active && (
                   <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-paper">
                     <Check size={14} />

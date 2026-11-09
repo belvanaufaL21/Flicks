@@ -13,6 +13,9 @@ export const MAX_TRYON_ATTEMPTS = 2;
 
 export async function startTryon(args: { sessionHash: string; analysisId: string; productId: string }) {
   if (!config.paidFeaturesEnabled) throw new FlowError("Layanan virtual try-on sedang dihentikan sementara.", 503);
+  if (config.fashn.mode === "missing") {
+    throw new FlowError("Layanan virtual try-on belum tersedia. Token kamu tidak terpakai.", 503);
+  }
   const store = getStore();
 
   const analysis = await analysisForSession(args.analysisId, args.sessionHash);

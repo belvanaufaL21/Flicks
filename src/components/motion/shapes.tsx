@@ -11,7 +11,9 @@ export function Grain() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[70] opacity-[0.045]"
+      // Own GPU layer: the noise tile is rasterised once and only composited while
+      // scrolling, instead of being repainted over the page every frame.
+      className="pointer-events-none fixed inset-0 z-[70] opacity-[0.045] [contain:strict] [transform:translateZ(0)]"
       style={{ backgroundImage: noise }}
     />
   );
@@ -74,16 +76,57 @@ const blobs = [
   "M110,15 C140,30 195,50 175,100 C165,140 150,175 100,185 C60,190 15,150 25,105 C30,60 70,5 110,15 Z",
 ];
 
-// Organic shape that slowly morphs between a few outlines.
+// Organic shape that slowly drifts. Two irregular outlines layered and turned in
+// opposite directions read as a morph, but only `transform` animates, which the GPU
+// handles. Animating the path's `d` re-tessellated the shape on the main thread
+// every frame.
 export function MorphBlob({ className = "", duration = 14 }: { className?: string; duration?: number }) {
   return (
-    <svg viewBox="0 0 200 200" className={className} aria-hidden="true">
-      <motion.path
-        fill="currentColor"
-        d={blobs[0]}
-        animate={{ d: [...blobs, blobs[0]] }}
+    <div className={className} aria-hidden="true">
+      <motion.svg
+        viewBox="0 0 200 200"
+        className="absolute inset-0 h-full w-full"
+        animate={{ rotate: [0, 14, -8, 0], scale: [1, 1.05, 0.97, 1] }}
         transition={{ duration, ease: "easeInOut", repeat: Infinity }}
-      />
-    </svg>
+      >
+        <path fill="currentColor" d={blobs[1]} />
+      </motion.svg>
+      <motion.svg
+        viewBox="0 0 200 200"
+        className="absolute inset-0 h-full w-full opacity-70"
+        animate={{ rotate: [0, -18, 10, 0], scale: [0.96, 1.02, 1, 0.96] }}
+        transition={{ duration: duration * 1.3, ease: "easeInOut", repeat: Infinity }}
+      >
+        <path fill="currentColor" d={blobs[2]} />
+      </motion.svg>
+    </div>
+  );
+}
+
+// A glowing line that sweeps up and down its container (scanner effect). The wrapper
+// fills the container and moves with translateY, so the percentages match the old
+// `top` animation while staying on the GPU instead of re-running layout every frame.
+export function SweepLine({
+  from,
+  to,
+  duration,
+  className = "",
+  layerClassName = "",
+}: {
+  from: string;
+  to: string;
+  duration: number;
+  className?: string;
+  layerClassName?: string;
+}) {
+  return (
+    <motion.div
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 ${layerClassName}`}
+      animate={{ y: [from, to, from] }}
+      transition={{ duration, ease: "easeInOut", repeat: Infinity }}
+    >
+      <div className={`absolute top-0 ${className}`} />
+    </motion.div>
   );
 }

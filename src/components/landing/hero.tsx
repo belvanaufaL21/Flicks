@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
 import { ArrowRight, ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
-import { Magnetic } from "@/components/motion/shapes";
+import { Magnetic, SweepLine } from "@/components/motion/shapes";
 
 const headline = [
   { text: "Kenali warnamu." },
@@ -238,10 +238,11 @@ export function Hero() {
                 ))}
 
                 {/* scan line */}
-                <motion.div
-                  animate={{ top: ["14%", "80%", "14%"] }}
-                  transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
-                  className="absolute inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
+                <SweepLine
+                  from="14%"
+                  to="80%"
+                  duration={4}
+                  className="inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
                 />
 
                 <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-paper/95 px-3 py-2.5 text-xs text-ink">

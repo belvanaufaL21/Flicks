@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { config } from "@/lib/config";
+import { config, missingProviders } from "@/lib/config";
+import { FlowError } from "./analysis.service";
 import { createQrisCharge, fetchRemoteStatus } from "@/lib/payments/midtrans";
 import { newId } from "@/lib/security";
 import { getStore } from "@/lib/store";
@@ -14,6 +15,12 @@ function newOrderId() {
 
 /** Reuses a usable payment for this browser, otherwise opens a new QRIS charge. */
 export async function startCheckout(sessionHash: string): Promise<Payment> {
+  // Never take money for a package that cannot be delivered in full.
+  const missing = missingProviders();
+  if (missing.length) {
+    console.error(`[checkout] refused: no API key for ${missing.join(", ")}`);
+    throw new FlowError("Pembelian belum tersedia. Coba lagi nanti.", 503);
+  }
   const store = getStore();
   const existing = await store.latestPaymentForSession(sessionHash);
   if (existing) {
