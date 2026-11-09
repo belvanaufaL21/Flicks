@@ -1,5 +1,5 @@
-import { config, isDemoMode, missingProviders } from "@/lib/config";
-import { getStore } from "@/lib/store";
+import { config, isDemoMode, missingSettings } from "@/lib/config";
+import { getStore, storeAvailable } from "@/lib/store";
 import { refreshPayment } from "./payment.service";
 import { refreshTryon } from "./tryon.service";
 
@@ -9,15 +9,19 @@ import { refreshTryon } from "./tryon.service";
 export type FlowState = Awaited<ReturnType<typeof getFlowState>>;
 
 export async function getFlowState(sessionHash: string | null, reportSecret: string | null) {
-  const store = getStore();
   const base = {
     demo: isDemoMode(),
-    // Sales are open only when the kill-switch is off and every provider has a key.
-    paidFeaturesEnabled: config.paidFeaturesEnabled && missingProviders().length === 0,
+    // Sales are open only when the kill-switch is off and production has every setting.
+    paidFeaturesEnabled: config.paidFeaturesEnabled && missingSettings().length === 0,
     priceIdr: config.priceIdr,
   };
+  const empty = { ...base, payment: null, token: null, analysis: null, tryon: null, reportPath: null };
+  // Without a database there is nothing to resume; show the page as "not available".
+  if (!storeAvailable()) return empty;
+
+  const store = getStore();
   const first = sessionHash ? await store.latestPaymentForSession(sessionHash) : null;
-  if (!first) return { ...base, payment: null, token: null, analysis: null, tryon: null, reportPath: null };
+  if (!first) return empty;
 
   await refreshPayment(first);
   const payment = first.status === "pending" ? (await store.latestPaymentForSession(sessionHash!))! : first;

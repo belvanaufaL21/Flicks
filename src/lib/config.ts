@@ -98,14 +98,24 @@ export function requireMediaSecret(): string {
   return config.mediaSigningSecret;
 }
 
-/** Providers that have no key in production. Non-empty means the package cannot be sold. */
-export function missingProviders() {
-  const all = { OpenRouter: config.openrouter.mode, FASHN: config.fashn.mode, Midtrans: config.midtrans.mode };
-  return Object.entries(all)
-    .filter(([, mode]) => mode === "missing")
+/**
+ * Names (never values) of the settings production still needs before the package can
+ * be sold. Empty in development, where missing providers fall back to demo mode.
+ */
+export function missingSettings(): string[] {
+  if (!config.isProduction) return [];
+  const required: Record<string, unknown> = {
+    NEXT_PUBLIC_SUPABASE_URL: config.supabase.url,
+    SUPABASE_SECRET_KEY: config.supabase.secretKey,
+    MEDIA_SIGNING_SECRET: config.mediaSigningSecret,
+    OPENROUTER_API_KEY: config.openrouter.mode !== "missing",
+    FASHN_API_KEY: config.fashn.mode !== "missing",
+    MIDTRANS_SERVER_KEY: config.midtrans.mode !== "missing",
+  };
+  return Object.entries(required)
+    .filter(([, v]) => !v)
     .map(([name]) => name);
 }
-
 export function isDemoMode() {
   return (
     config.openrouter.mode === "mock" || config.fashn.mode === "mock" || config.midtrans.mode === "mock"
