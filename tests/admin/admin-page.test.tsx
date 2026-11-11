@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminDashboardView } from '../../src/app/admin/admin-dashboard-view';
 import { AdminLoginView } from '../../src/app/admin/login/admin-login-view';
@@ -157,26 +157,32 @@ describe('Admin UI (/admin & /admin/login)', () => {
     cleanup();
   });
 
-  it('renders admin login form and invokes credential / local dev login callbacks', () => {
+  it('renders split-brand admin login form with accessible autocomplete and invokes callbacks', () => {
     const onSubmitCredentials = vi.fn();
     const onLocalDevLogin = vi.fn();
 
     render(
       <AdminLoginView
         allowLocalDevFallback={true}
+        errorMessage="Invalid administrator credentials."
         onSubmitCredentials={onSubmitCredentials}
         onLocalDevLogin={onLocalDevLogin}
       />,
     );
 
     expect(screen.getByText(/Administrator Sign In/i)).toBeTruthy();
+    expect(screen.getByText(/Admin Workspace/i)).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Invalid administrator credentials.',
+    );
 
-    fireEvent.change(screen.getByLabelText(/Email/i), {
-      target: { value: 'admin@flicks.id' },
-    });
-    fireEvent.change(screen.getByLabelText(/Password/i), {
-      target: { value: 'secret-password' },
-    });
+    const emailInput = screen.getByLabelText(/Email/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/Password/i) as HTMLInputElement;
+    expect(emailInput.getAttribute('autocomplete')).toBe('email');
+    expect(passwordInput.getAttribute('autocomplete')).toBe('current-password');
+
+    fireEvent.change(emailInput, { target: { value: 'admin@flicks.id' } });
+    fireEvent.change(passwordInput, { target: { value: 'secret-password' } });
     fireEvent.click(screen.getByRole('button', { name: /Sign In/i }));
 
     expect(onSubmitCredentials).toHaveBeenCalledWith({
@@ -184,10 +190,9 @@ describe('Admin UI (/admin & /admin/login)', () => {
       password: 'secret-password',
     });
 
-    const devButton = screen.getByRole('button', {
-      name: /Continue with Local Dev Admin/i,
-    });
-    fireEvent.click(devButton);
+    fireEvent.click(
+      screen.getByRole('button', { name: /Continue with Local Dev Admin/i }),
+    );
     expect(onLocalDevLogin).toHaveBeenCalledOnce();
   });
 
@@ -205,10 +210,10 @@ describe('Admin UI (/admin & /admin/login)', () => {
       />,
     );
 
-    expect(screen.getByText(/Rp 44\.997|44,997/i)).toBeTruthy();
+    expect(screen.getAllByText(/Rp 44\.997|44,997/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/75%/i)).toBeTruthy();
-    expect(screen.getByText(/Estimated \(Gemini\)/i)).toBeTruthy();
-    expect(screen.getByText(/Actual \(FASHN\)/i)).toBeTruthy();
+    expect(screen.getByText(/Estimated \(Gemini/i)).toBeTruthy();
+    expect(screen.getByText(/Actual \(FASHN/i)).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole('tab', { name: /Transactions & Tokens/i }),
@@ -224,12 +229,16 @@ describe('Admin UI (/admin & /admin/login)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
     expect(screen.getByText(/Terracotta Linen Overshirt/i)).toBeTruthy();
 
-    const deactivateBtn = screen.getByRole('button', {
-      name: /Deactivate/i,
+    expect(screen.queryByRole('button', { name: /^Deactivate$/i })).toBeNull();
+
+    const statusBtn = screen.getByRole('button', {
+      name: /Ubah status Terracotta Linen Overshirt/i,
     });
-    fireEvent.click(deactivateBtn);
+    expect(statusBtn.textContent).toContain('Active');
+    fireEvent.click(statusBtn);
     expect(onDeactivateProduct).toHaveBeenCalledWith('prod-active-1');
 
+    fireEvent.click(screen.getByRole('tab', { name: /Financials & Costs/i }));
     fireEvent.click(screen.getByRole('tab', { name: /Usage & Costs/i }));
     expect(screen.getByText(/gemini-2.5-flash/i)).toBeTruthy();
     expect(screen.getByText(/tryon-v1.6/i)).toBeTruthy();
@@ -256,19 +265,27 @@ describe('Admin UI (/admin & /admin/login)', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
 
+    // Click "+ Tambah Produk Baru" to open Slide-Over Drawer
+    fireEvent.click(
+      screen.getByRole('button', { name: /\+ Tambah Produk Baru/i }),
+    );
+
+    const drawer = screen.getByRole('dialog', { name: /Tambah Produk Baru/i });
+    expect(drawer).toBeTruthy();
+
     // Subcategory and Image Storage Path inputs should not exist
     expect(screen.queryByLabelText(/Subcategory/i)).toBeNull();
     expect(screen.queryByLabelText(/Image Storage Path/i)).toBeNull();
 
     // Category should be a select dropdown with multiple category options
-    const categorySelect = screen.getByLabelText(/Category|Kategori/i) as HTMLSelectElement;
+    const categorySelect = within(drawer).getByLabelText(/Category|Kategori/i) as HTMLSelectElement;
     expect(categorySelect.tagName).toBe('SELECT');
     expect(categorySelect.options.length).toBeGreaterThan(3);
     fireEvent.change(categorySelect, { target: { value: 'outerwear' } });
 
     // Gender selection
-    const priaRadio = screen.getByLabelText(/Pria/i);
-    const wanitaRadio = screen.getByLabelText(/Wanita/i);
+    const priaRadio = within(drawer).getByLabelText(/Pria/i);
+    const wanitaRadio = within(drawer).getByLabelText(/Wanita/i);
     expect(priaRadio).toBeTruthy();
     expect(wanitaRadio).toBeTruthy();
 
@@ -282,17 +299,21 @@ describe('Admin UI (/admin & /admin/login)', () => {
     expect(screen.getByText(/Trapezoid \(Trapesium\)/i)).toBeTruthy();
     expect(screen.queryByText(/Hourglass \(Jam Pasir\)/i)).toBeNull();
 
-    // Toggle chips
+    // Toggle chips inside drawer
     fireEvent.click(screen.getByText(/Trapezoid \(Trapesium\)/i));
-    fireEvent.click(screen.getByText(/Autumn/i));
-    fireEvent.click(screen.getByRole('button', { name: /^L$/i }));
+    fireEvent.click(within(drawer).getByRole('button', { name: /^Autumn$/i }));
+    fireEvent.click(within(drawer).getByRole('button', { name: /^L$/i }));
 
-    // Upload photo
-    const fileInput = screen.getByLabelText(/Upload Foto Produk/i);
+    // Upload photo (opens 3:4 cropper modal)
+    const fileInput = within(drawer).getByLabelText(/Upload Foto Produk/i);
     const sampleFile = new File([new Uint8Array([137, 80, 78, 71])], 'oxford.png', {
       type: 'image/png',
     });
     fireEvent.change(fileInput, { target: { files: [sampleFile] } });
+
+    // Confirm crop in 3:4 modal
+    expect(screen.getByText(/Sesuaikan Foto Produk \(3:4\)/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Potong & Gunakan Foto/i }));
 
     expect(onUploadPhoto).toHaveBeenCalledWith(sampleFile);
 
@@ -307,7 +328,9 @@ describe('Admin UI (/admin & /admin/login)', () => {
     const submitButton = await screen.findByRole('button', {
       name: /Save to Catalog|Tambah ke Katalog/i,
     });
-    fireEvent.click(submitButton);
+    await act(async () => {
+      fireEvent.click(submitButton);
+    });
 
     expect(onCreateProduct).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -438,7 +461,9 @@ describe('Admin UI (/admin & /admin/login)', () => {
     const saveBtn = screen.getByRole('button', {
       name: /Simpan Perubahan|Save Changes/i,
     });
-    fireEvent.click(saveBtn);
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
 
     expect(onUpdateProduct).toHaveBeenCalledWith(
       'prod-edit-1',
@@ -459,6 +484,271 @@ describe('Admin UI (/admin & /admin/login)', () => {
     expect(deleteBtn.querySelector('svg')).toBeTruthy();
     expect(deleteBtn.textContent?.trim()).toBe('');
     fireEvent.click(deleteBtn);
+
+    // Confirmation dialog should appear
+    expect(screen.getByText('Hapus Produk dari Katalog?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Ya, Hapus Permanen/i }));
     expect(onDeleteProduct).toHaveBeenCalledWith('prod-edit-1');
+  });
+
+  it('displays preview image in edit modal, handles photo replacement, and falls back to placeholder on image error', async () => {
+    const onUploadPhoto = vi.fn().mockResolvedValue({
+      imagePath: '/uploads/products/updated-gown.jpg',
+      previewUrl: 'https://supabase.co/storage/v1/object/public/product-images/updated-gown.jpg',
+    });
+
+    const editableProducts: CatalogProductRecord[] = [
+      {
+        id: 'prod-preview-1',
+        name: 'Burgundy Ruched Gown',
+        brand: 'FLICKS Studio',
+        category: 'dress',
+        subcategory: null,
+        imagePath: '/uploads/products/burgundy-gown.jpg',
+        sourceUrl: null,
+        labels: {
+          gender: 'female',
+          preview_url: '/uploads/products/burgundy-gown.jpg',
+        },
+        isActive: true,
+        createdAt: '2026-11-06T00:00:00.000Z',
+        updatedAt: '2026-11-06T00:00:00.000Z',
+      },
+    ];
+
+    render(
+      <AdminDashboardView
+        summary={sampleSummary}
+        transactions={sampleTransactions}
+        tokens={sampleTokens}
+        jobs={sampleJobs}
+        products={editableProducts}
+        onUploadPhoto={onUploadPhoto}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
+
+    const editBtn = screen.getByRole('button', { name: /^Edit$/i });
+    fireEvent.click(editBtn);
+
+    // Verify preview image is rendered in modal
+    const previewImg = screen.getByAltText(/Preview Edit Produk/i) as HTMLImageElement;
+    expect(previewImg).toBeTruthy();
+    expect(previewImg.src).toContain('/uploads/products/burgundy-gown.jpg');
+
+    // Trigger onError fallback
+    fireEvent.error(previewImg);
+    expect(previewImg.src).toContain('/uploads/products/placeholder.jpg');
+
+    // Replace photo via file input (opens 3:4 cropper modal)
+    const fileInput = screen.getByLabelText(/Ganti Foto Produk/i);
+    const replacementFile = new File([new Uint8Array([255, 216, 255])], 'new-gown.jpg', {
+      type: 'image/jpeg',
+    });
+    fireEvent.change(fileInput, { target: { files: [replacementFile] } });
+
+    // Confirm crop in 3:4 modal
+    expect(screen.getByText(/Sesuaikan Foto Produk \(3:4\)/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Potong & Gunakan Foto/i }));
+
+    expect(onUploadPhoto).toHaveBeenCalledWith(replacementFile);
+    await vi.waitFor(() => {
+      expect(previewImg.src).toBe(
+        'https://supabase.co/storage/v1/object/public/product-images/updated-gown.jpg',
+      );
+    });
+  });
+
+  it('supports canceling interactive cropper modal without uploading', async () => {
+    const onUploadPhoto = vi.fn();
+    render(
+      <AdminDashboardView
+        summary={sampleSummary}
+        transactions={[]}
+        tokens={[]}
+        jobs={[]}
+        products={[]}
+        onUploadPhoto={onUploadPhoto}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
+
+    // Open create drawer first
+    fireEvent.click(
+      screen.getByRole('button', { name: /\+ Tambah Produk Baru/i }),
+    );
+
+    const fileInput = screen.getByLabelText(/Upload Foto Produk/i);
+    const testFile = new File(['test-img'], 'test.png', { type: 'image/png' });
+    fireEvent.change(fileInput, { target: { files: [testFile] } });
+
+    const cropperModal = screen.getByRole('dialog', {
+      name: /Sesuaikan Foto Produk/i,
+    });
+    expect(cropperModal).toBeTruthy();
+    expect(within(cropperModal).getByLabelText(/Zoom/i)).toBeTruthy();
+
+    // Cancel modal
+    fireEvent.click(within(cropperModal).getByRole('button', { name: /Batal/i }));
+
+    expect(screen.queryByText(/Sesuaikan Foto Produk \(3:4\)/i)).toBeNull();
+    expect(onUploadPhoto).not.toHaveBeenCalled();
+  });
+
+  it('supports cropping existing catalog product photo from edit modal', async () => {
+    const onUploadPhoto = vi.fn().mockResolvedValue({
+      imagePath: 'https://supabase.co/storage/v1/object/public/product-images/recropped.jpg',
+      previewUrl: 'https://supabase.co/storage/v1/object/public/product-images/recropped.jpg',
+    });
+    const onUpdateProduct = vi.fn().mockResolvedValue(undefined);
+    const existingProduct: CatalogProductRecord = {
+      id: 'prod-crop-1',
+      name: 'Burgundy Ruched Gown',
+      brand: 'FLICKS Studio',
+      category: 'dress',
+      subcategory: null,
+      imagePath: '/uploads/products/burgundy-gown.jpg',
+      sourceUrl: null,
+      labels: {
+        gender: 'female',
+        preview_url: '/uploads/products/burgundy-gown.jpg',
+      },
+      isActive: true,
+      createdAt: '2026-11-06T00:00:00.000Z',
+      updatedAt: '2026-11-06T00:00:00.000Z',
+    };
+
+    render(
+      <AdminDashboardView
+        summary={sampleSummary}
+        transactions={[]}
+        tokens={[]}
+        jobs={[]}
+        products={[existingProduct]}
+        onUploadPhoto={onUploadPhoto}
+        onUpdateProduct={onUpdateProduct}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
+
+    // Open Edit modal
+    fireEvent.click(screen.getByTitle('Edit Produk'));
+    expect(screen.getByRole('heading', { name: /Edit Produk/i })).toBeTruthy();
+
+    // Click "Sesuaikan / Crop Foto Saat Ini (3:4)"
+    const cropExistingBtn = screen.getByRole('button', {
+      name: /Sesuaikan \/ Crop Foto Saat Ini \(3:4\)/i,
+    });
+    expect(cropExistingBtn).toBeTruthy();
+    fireEvent.click(cropExistingBtn);
+
+    // Cropper modal opens
+    expect(screen.getByText(/Sesuaikan Foto Produk \(3:4\)/i)).toBeTruthy();
+
+    // Apply crop
+    fireEvent.click(
+      screen.getByRole('button', { name: /Potong & Gunakan Foto/i }),
+    );
+
+    await vi.waitFor(() => {
+      expect(onUploadPhoto).toHaveBeenCalledTimes(1);
+      const previewImg = screen.getByAltText(/Preview Edit Produk/i) as HTMLImageElement;
+      expect(previewImg.src).toBe(
+        'https://supabase.co/storage/v1/object/public/product-images/recropped.jpg',
+      );
+    });
+
+    // Save changes
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Simpan Perubahan/i }),
+      );
+    });
+
+    expect(onUpdateProduct).toHaveBeenCalledWith(
+      existingProduct.id,
+      expect.objectContaining({
+        imagePath:
+          'https://supabase.co/storage/v1/object/public/product-images/recropped.jpg',
+      }),
+    );
+  });
+
+  it('toggles product status directly by clicking the status badge and removes redundant row crop button', async () => {
+    const onDeactivateProduct = vi.fn().mockResolvedValue(undefined);
+    const onUpdateProduct = vi.fn().mockResolvedValue(undefined);
+    const existingProduct: CatalogProductRecord = {
+      id: 'prod-crop-2',
+      name: 'Classic Linen Blazer',
+      brand: 'FLICKS Studio',
+      category: 'outerwear',
+      subcategory: null,
+      imagePath: '/uploads/products/linen-blazer.jpg',
+      sourceUrl: null,
+      labels: {
+        gender: 'unisex',
+        preview_url: '/uploads/products/linen-blazer.jpg',
+      },
+      isActive: true,
+      createdAt: '2026-11-06T00:00:00.000Z',
+      updatedAt: '2026-11-06T00:00:00.000Z',
+    };
+
+    const { rerender } = render(
+      <AdminDashboardView
+        summary={sampleSummary}
+        transactions={[]}
+        tokens={[]}
+        jobs={[]}
+        products={[existingProduct]}
+        onDeactivateProduct={onDeactivateProduct}
+        onUpdateProduct={onUpdateProduct}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Product Catalog/i }));
+
+    // Verify row crop icon button was removed
+    expect(screen.queryByTitle('Sesuaikan / Crop Foto (3:4)')).toBeNull();
+
+    // Toggle active -> inactive
+    const activeStatusBtn = screen.getByRole('button', {
+      name: /Ubah status Classic Linen Blazer/i,
+    });
+    expect(activeStatusBtn.textContent).toContain('Active');
+    await act(async () => {
+      fireEvent.click(activeStatusBtn);
+    });
+
+    expect(onDeactivateProduct).toHaveBeenCalledWith(existingProduct.id);
+
+    // Rerender as inactive
+    rerender(
+      <AdminDashboardView
+        summary={sampleSummary}
+        transactions={[]}
+        tokens={[]}
+        jobs={[]}
+        products={[{ ...existingProduct, isActive: false }]}
+        onDeactivateProduct={onDeactivateProduct}
+        onUpdateProduct={onUpdateProduct}
+      />,
+    );
+
+    // Toggle inactive -> active
+    const inactiveStatusBtn = screen.getByRole('button', {
+      name: /Ubah status Classic Linen Blazer/i,
+    });
+    expect(inactiveStatusBtn.textContent).toContain('Inactive');
+    await act(async () => {
+      fireEvent.click(inactiveStatusBtn);
+    });
+
+    expect(onUpdateProduct).toHaveBeenCalledWith(existingProduct.id, {
+      isActive: true,
+    });
   });
 });

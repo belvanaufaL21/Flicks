@@ -28,70 +28,101 @@ export function AdminLoginView({
   };
 
   return (
-    <main className={styles.adminShell}>
-      <div className={styles.loginCard}>
-        <h1 className={styles.headerTitle}>Administrator Sign In</h1>
-        <p className={styles.headerSubtitle}>
-          Sign in with an authorized Flicks admin account.
-        </p>
-
-        {errorMessage ? (
-          <div className={styles.errorBanner} role="alert">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} style={{ marginTop: '1.25rem' }}>
-          <div className={styles.formField} style={{ marginBottom: '0.85rem' }}>
-            <label htmlFor="admin-email" className={styles.formLabel}>
-              Email
-            </label>
-            <input
-              id="admin-email"
-              type="email"
-              required
-              className={styles.formInput}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@flicks.id"
-            />
+    <main className={styles.loginShell}>
+      <div className={styles.loginSplitCard}>
+        <div className={styles.loginBrandPanel}>
+          <div className={styles.loginBrandHeader}>
+            <span className={styles.loginBrandMonogram} aria-hidden="true">
+              F
+            </span>
+            <div>
+              <div className={styles.loginBrandTitle}>FLICKS</div>
+              <div className={styles.loginBrandWorkspace}>Admin Workspace</div>
+            </div>
           </div>
 
-          <div className={styles.formField} style={{ marginBottom: '1.1rem' }}>
-            <label htmlFor="admin-password" className={styles.formLabel}>
-              Password
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              required
-              className={styles.formInput}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <div className={styles.loginBrandBody}>
+            <h2 className={styles.loginBrandHeading}>
+              Sistem Manajemen Kurasi & Operasional AI
+            </h2>
+            <p className={styles.loginBrandText}>
+              Kelola katalog pakaian, pantau transaksi pelanggan, dan audit performa model visual dalam satu workspace terpadu.
+            </p>
           </div>
 
-          <button
-            type="submit"
-            className={styles.primaryButton}
-            style={{ width: '100%' }}
-          >
-            Sign In
-          </button>
-        </form>
+          <div className={styles.loginBrandFooter}>
+            <span className={styles.loginBrandDot} aria-hidden="true" />
+            <span>Authorized Staff Only</span>
+          </div>
+        </div>
 
-        {allowLocalDevFallback && onLocalDevLogin ? (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+        <div className={styles.loginFormPanel}>
+          <h1 className={styles.loginFormTitle}>Administrator Sign In</h1>
+          <p className={styles.loginFormSubtitle}>
+            Sign in with an authorized Flicks admin account.
+          </p>
+
+          {errorMessage ? (
+            <div className={styles.errorBanner} role="alert">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit}>
+            <div className={styles.formField} style={{ marginBottom: '0.85rem' }}>
+              <label htmlFor="admin-email" className={styles.formLabel}>
+                Email
+              </label>
+              <input
+                id="admin-email"
+                type="email"
+                required
+                autoComplete="email"
+                spellCheck={false}
+                className={styles.formInput}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@flicks.id"
+              />
+            </div>
+
+            <div className={styles.formField} style={{ marginBottom: '1.25rem' }}>
+              <label htmlFor="admin-password" className={styles.formLabel}>
+                Password
+              </label>
+              <input
+                id="admin-password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className={styles.formInput}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
             <button
-              type="button"
-              onClick={() => void onLocalDevLogin()}
-              className={styles.secondaryButton}
-              style={{ width: '100%' }}
+              type="submit"
+              className={styles.primaryButton}
+              style={{ width: '100%', padding: '0.65rem 1rem' }}
             >
-              Continue with Local Dev Admin
+              Sign In
             </button>
-          </div>
-        ) : null}
+          </form>
+
+          {allowLocalDevFallback && onLocalDevLogin ? (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--admin-border)' }}>
+              <button
+                type="button"
+                onClick={() => void onLocalDevLogin()}
+                className={styles.secondaryButton}
+                style={{ width: '100%' }}
+              >
+                Continue with Local Dev Admin
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </main>
   );

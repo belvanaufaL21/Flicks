@@ -166,6 +166,13 @@ describe('Admin Dashboard View - Financial Snapshot Card', () => {
     expect(screen.getByText('Total COGS (HPP)')).toBeTruthy();
     expect(screen.getByText('Laba Bersih (Net Profit)')).toBeTruthy();
     expect(screen.getByText('Unit Economics (Avg/User)')).toBeTruthy();
+
+    // Verify sub-tabs inside Financials & Costs
+    const usageSubTab = screen.getByRole('tab', { name: /Usage & Costs/i });
+    expect(usageSubTab).toBeTruthy();
+    fireEvent.click(usageSubTab);
+    expect(screen.getByText(/gemini-2\.5-flash/i)).toBeTruthy();
+    expect(screen.getByText(/tryon-v1\.6/i)).toBeTruthy();
   });
 
   it('renders P&L ledger table and triggers CSV export on click', async () => {
@@ -200,10 +207,10 @@ describe('Admin Dashboard View - Financial Snapshot Card', () => {
     const exportedBlob = createObjectUrlMock.mock.calls[0][0] as Blob;
     const csvText = await exportedBlob.text();
     expect(csvText).toContain(
-      'Order Reference,Paid At,Gross Revenue (IDR),Midtrans Fee 0.7% (IDR),Gemini Cost (IDR),FASHN Cost (IDR),Total COGS (IDR),Gross Profit (IDR),Gross Margin (%)',
+      'Order Reference,Tanggal Bayar,Pendapatan (IDR),Fee Midtrans (IDR),Beban Gemini (IDR),Beban FASHN (IDR),Laba Kotor (IDR),Margin (%)',
     );
     expect(csvText).toContain(
-      '"ORDER-001","2026-11-06T10:00:00.000Z",19000,133,1000,2700,3833,15167,80%',
+      '"ORDER-001","2026-11-06T10:00:00.000Z","19000","133","1000","2700","15167","80%"',
     );
 
     anchorClickSpy.mockRestore();

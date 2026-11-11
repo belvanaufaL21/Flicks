@@ -7,13 +7,15 @@ import {
   GET as getKillSwitch,
   POST as postKillSwitch,
 } from '../../src/app/api/admin/system/kill-switch/route';
+import {
+  POST as postCleanupPhotos,
+} from '../../src/app/api/admin/system/cleanup-photos/route';
 import { POST as postAnalysis } from '../../src/app/api/analysis/route';
 import { POST as postVto } from '../../src/app/api/virtual-try-on/route';
 import {
   createInMemoryTokenRepository,
   resetLocalDevMemoryState,
 } from '../../src/server/dev/local-memory-store';
-import { resetRateLimitsForTesting } from '../../src/server/security/rate-limiter';
 import { createTokenService } from '../../src/server/tokens/token.service';
 import { checkVtoQuota } from '../../src/server/vto/virtual-try-on.service';
 
@@ -49,10 +51,9 @@ const SAMPLE_SUMMARY = {
   },
 };
 
-describe('Task 1.4: Operator Kill Switch & Paid Work Maintenance Pause', () => {
+describe('Operator Kill Switch & Paid Work Maintenance Pause', () => {
   beforeEach(() => {
     resetLocalDevMemoryState();
-    resetRateLimitsForTesting();
     vi.stubEnv('NODE_ENV', 'development');
   });
 
@@ -189,7 +190,17 @@ describe('Task 1.4: Operator Kill Switch & Paid Work Maintenance Pause', () => {
       name: /Pause Paid AI Work/i,
     });
     fireEvent.click(pauseButton);
-    expect(onToggleKillSwitch).toHaveBeenCalledWith(true);
+
+    // Confirm dialog appears
+    expect(screen.getByText(/Jeda Operasional AI Berbayar\?/i)).toBeDefined();
+    const confirmButton = screen.getByRole('button', {
+      name: /Ya, Jeda AI Berbayar/i,
+    });
+    fireEvent.click(confirmButton);
+    expect(onToggleKillSwitch).toHaveBeenCalledWith(
+      true,
+      expect.stringMatching(/Admin paused via dashboard|Jeda operasional AI/i),
+    );
 
     rerender(
       <AdminDashboardView
@@ -213,5 +224,25 @@ describe('Task 1.4: Operator Kill Switch & Paid Work Maintenance Pause', () => {
     });
     fireEvent.click(resumeButton);
     expect(onToggleKillSwitch).toHaveBeenCalledWith(false);
+  });
+
+  it('protects POST /api/admin/system/cleanup-photos with admin session and supports local dev fallback', async () => {
+    const unauthRes = await postCleanupPhotos(
+      new Request('http://localhost/api/admin/system/cleanup-photos', {
+        method: 'POST',
+      }),
+    );
+    expect(unauthRes.status).toBe(401);
+
+    const authRes = await postCleanupPhotos(
+      new Request('http://localhost/api/admin/system/cleanup-photos', {
+        method: 'POST',
+        headers: { 'x-flicks-dev-admin': '1' },
+      }),
+    );
+    expect(authRes.status).toBe(200);
+    const json = await authRes.json();
+    expect(json.ok).toBe(true);
+    expect(typeof json.deletedCount).toBe('number');
   });
 });

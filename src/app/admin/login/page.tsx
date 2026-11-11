@@ -11,8 +11,7 @@ export default function AdminLoginPage() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const allowLocalDevFallback =
-    process.env.NODE_ENV !== 'production' && (!supabaseUrl || !supabaseAnonKey);
+  const allowLocalDevFallback = process.env.NODE_ENV !== 'production';
 
   const handleCredentialsSubmit = async ({
     email,
@@ -46,6 +45,7 @@ export default function AdminLoginPage() {
 
     const token = data.session.access_token;
     window.sessionStorage.setItem('flicks_admin_access_token', token);
+    window.localStorage.setItem('flicks_admin_access_token', token);
     document.cookie = `sb-access-token=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
     router.push('/admin');
   };

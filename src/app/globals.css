@@ -24,6 +24,13 @@ html {
   scroll-behavior: smooth;
 }
 
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
 /* Lenis animates the scroll itself; native smooth scrolling would fight it. */
 @media (prefers-reduced-motion: reduce) {
   html {

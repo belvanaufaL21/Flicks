@@ -185,14 +185,20 @@ export default function AdminDashboardPage() {
     };
   };
 
-  const handleToggleKillSwitch = async (nextPaused: boolean) => {
+  const handleToggleKillSwitch = async (
+    nextPaused: boolean,
+    reason?: string,
+  ) => {
     const res = await fetch('/api/admin/system/kill-switch', {
       method: 'POST',
       headers: {
         ...getAuthHeaders(),
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ paidWorkPaused: nextPaused }),
+      body: JSON.stringify({
+        paidWorkPaused: nextPaused,
+        ...(reason ? { reason } : {}),
+      }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -201,19 +207,27 @@ export default function AdminDashboardPage() {
   };
 
   const handleCleanupExpiredPhotos = async () => {
-    if (!window.confirm('Delete all expired private photos older than 72 hours?')) {
-      return;
-    }
     const res = await fetch('/api/admin/system/cleanup-photos', {
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error ?? 'Gagal membersihkan foto kedaluwarsa.');
+    }
     return {
-      deletedCount: Number(data.deletedCount ?? 0),
-      failedCount: Number(data.failedCount ?? 0),
+      deletedCount: typeof data.deletedCount === 'number' ? data.deletedCount : 0,
+      mode: typeof data.mode === 'string' ? data.mode : 'production',
     };
+  };
+
+  const handleSignOut = async () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('flicks_admin_access_token');
+      window.localStorage.removeItem('flicks_admin_access_token');
+      document.cookie = 'sb-access-token=; path=/; max-age=0; SameSite=Lax';
+    }
+    router.push('/admin/login');
   };
 
   return (
@@ -226,6 +240,8 @@ export default function AdminDashboardPage() {
       killSwitch={killSwitch}
       onToggleKillSwitch={handleToggleKillSwitch}
       onCleanupExpiredPhotos={handleCleanupExpiredPhotos}
+      onRefresh={loadDashboardData}
+      onSignOut={handleSignOut}
       onCreateProduct={handleCreateProduct}
       onUpdateProduct={handleUpdateProduct}
       onDeleteProduct={handleDeleteProduct}
