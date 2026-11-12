@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (!rateLimit(`checkout:${clientKey(request)}`, 10, 60_000)) return tooManyRequests();
   try {
     const payment = await startCheckout(await ensureSessionHash());
-    return json({ orderId: payment.providerReference, status: payment.status });
+    return json({ orderId: payment.providerReference, status: payment.status, paymentUrl: payment.paymentUrl });
   } catch (err) {
     return errorResponse(err);
   }

@@ -1,19 +1,20 @@
 import { randomBytes } from "node:crypto";
 import { config, missingSettings } from "@/lib/config";
 import { FlowError } from "./analysis.service";
-import { createQrisCharge, fetchRemoteStatus } from "@/lib/payments/midtrans";
+import { createQrisPayment, fetchRemoteStatus } from "@/lib/payments/midtrans";
 import { newId } from "@/lib/security";
 import { getStore } from "@/lib/store";
 import type { Payment } from "@/types/domain";
 
-const PENDING_TTL_MS = 15 * 60 * 1000;
+const PENDING_TTL_MINUTES = 15;
+const PENDING_TTL_MS = PENDING_TTL_MINUTES * 60 * 1000;
 
 function newOrderId() {
   const day = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   return `FLK-${day}-${randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
-/** Reuses a usable payment for this browser, otherwise opens a new QRIS charge. */
+/** Reuses a usable payment for this browser, otherwise opens a new QRIS payment on Midtrans. */
 export async function startCheckout(sessionHash: string): Promise<Payment> {
   // Never take money for a package that cannot be delivered in full.
   const missing = missingSettings();
@@ -31,7 +32,7 @@ export async function startCheckout(sessionHash: string): Promise<Payment> {
   }
 
   const orderId = newOrderId();
-  const charge = await createQrisCharge(orderId, config.priceIdr);
+  const charge = await createQrisPayment(orderId, config.priceIdr, PENDING_TTL_MINUTES);
   return store.insertPayment({
     id: newId("pay"),
     provider: config.midtrans.mode === "mock" ? "mock" : "midtrans",
@@ -40,8 +41,8 @@ export async function startCheckout(sessionHash: string): Promise<Payment> {
     amount: config.priceIdr,
     currency: "IDR",
     status: "pending",
-    qrUrl: charge.qrUrl,
-    qrString: charge.qrString,
+    paymentUrl: charge.paymentUrl,
+    qrString: null,
     expiresAt: charge.expiresAt,
     createdAt: new Date().toISOString(),
     paidAt: null,

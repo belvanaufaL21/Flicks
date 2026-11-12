@@ -302,7 +302,24 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
 
         {pending ? (
           <div className="mt-6 text-center">
-            <QrBox url={payment.qrUrl} simulated={payment.simulated} />
+            {payment.simulated ? (
+              <QrBox />
+            ) : (
+              payment.paymentUrl && (
+                <a
+                  href={payment.paymentUrl}
+                  className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
+                >
+                  <QrCode size={16} /> Buka halaman pembayaran QRIS
+                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                </a>
+              )
+            )}
+            {!payment.simulated && (
+              <p className="mt-3 text-xs text-muted">
+                Kode QRIS ditampilkan di halaman Midtrans. Setelah membayar, kamu otomatis kembali ke sini.
+              </p>
+            )}
             <p className="mt-4 flex items-center justify-center gap-2 text-sm text-muted">
               <Loader2 size={14} className="animate-spin" /> Menunggu pembayaran…
             </p>
@@ -328,7 +345,13 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
               className="w-full"
               busy={busy}
               disabled={!state.paidFeaturesEnabled}
-              onClick={() => run(() => api("/api/checkout", { method: "POST" }))}
+              onClick={() =>
+                run(async () => {
+                  const res = await api<{ paymentUrl: string | null }>("/api/checkout", { method: "POST" });
+                  // Live payments continue on Midtrans's QRIS page; demo mode stays here.
+                  if (res.paymentUrl) window.location.assign(res.paymentUrl);
+                })
+              }
             >
               Bayar {rupiah(state.priceIdr)} dengan QRIS <ArrowRight size={16} />
             </PrimaryButton>
@@ -343,11 +366,7 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
   );
 }
 
-function QrBox({ url, simulated }: { url: string | null; simulated: boolean }) {
-  if (url && !simulated) {
-    // eslint-disable-next-line @next/next/no-img-element -- QR image served by Midtrans
-    return <img src={url} alt="Kode QRIS untuk pembayaran" className="mx-auto h-56 w-56 rounded-xl bg-white p-2" />;
-  }
+function QrBox() {
   // Demo placeholder: a decorative pattern, deliberately not a scannable code.
   const cells = Array.from({ length: 21 * 21 }, (_, i) => ((Math.imul(i + 1, 2654435761) >>> 0) >>> 28) % 3 === 0);
   return (

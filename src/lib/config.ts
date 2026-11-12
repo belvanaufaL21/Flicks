@@ -79,6 +79,10 @@ export const config = {
       env.MIDTRANS_IS_PRODUCTION === "true"
         ? "https://api.midtrans.com"
         : "https://api.sandbox.midtrans.com",
+    snapUrl:
+      env.MIDTRANS_IS_PRODUCTION === "true"
+        ? "https://app.midtrans.com"
+        : "https://app.sandbox.midtrans.com",
   },
 
   // Signs short-lived URLs for private photos. A per-process fallback is fine in

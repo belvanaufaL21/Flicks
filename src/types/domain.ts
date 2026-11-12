@@ -15,7 +15,8 @@ export type Payment = {
   amount: number;
   currency: "IDR";
   status: PaymentStatus;
-  qrUrl: string | null;
+  /** Midtrans payment page (Snap) that shows the QRIS code. Stored in the qr_url column. */
+  paymentUrl: string | null;
   qrString: string | null;
   expiresAt: string | null;
   createdAt: string;
