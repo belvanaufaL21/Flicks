@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FASHN_CREDIT_COST_IDR } from '../../src/server/providers/fashn';
 import {
   createVirtualTryOnService,
   MAX_VTO_ATTEMPTS,
@@ -854,7 +855,7 @@ describe('virtual-try-on service and endpoints (Tasks 3.2, 3.3, 3.4)', () => {
           status: 'completed' as const,
           outputDataUri: `data:image/jpeg;base64,${jpegBase64}`,
           creditsUsed: 1,
-          estimatedCostIdr: 1350,
+          estimatedCostIdr: FASHN_CREDIT_COST_IDR,
           model: 'tryon-v1.6',
         });
         const photoStorage = {
@@ -892,7 +893,7 @@ describe('virtual-try-on service and endpoints (Tasks 3.2, 3.3, 3.4)', () => {
           provider: 'fashn',
           feature: 'virtual_try_on',
           status: 'completed',
-          estimatedCostIdr: 1350,
+          estimatedCostIdr: FASHN_CREDIT_COST_IDR,
         });
       });
 

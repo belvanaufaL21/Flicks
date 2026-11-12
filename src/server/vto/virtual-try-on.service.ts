@@ -7,10 +7,6 @@ import {
 } from '@/server/dev/local-memory-store';
 import { getRequiredEnv } from '@/server/env';
 import {
-  recordOperationalEvent,
-  trackPaidExecutionAndDetectSpike,
-} from '@/server/monitoring/monitor';
-import {
   FASHN_CREDIT_COST_IDR,
   FASHN_ESTIMATED_COST_IDR,
   FashnProviderError,
@@ -25,6 +21,16 @@ import {
 } from '@/server/storage/private-photo-storage';
 import { createSupabaseTokenService } from '@/server/tokens/token.service';
 import type { StoredPhotoKind } from '@/shared/photo-policy';
+
+export type { UsageEventRecord as VtoUsageEvent };
+
+export interface RecordPipelineExecutionInput {
+  tokenId: string;
+  topProductId?: string | null;
+  bottomProductId?: string | null;
+  userPhotoUri: string;
+  pipelineResult: VtoPipelineResult;
+}
 
 export const MAX_VTO_ATTEMPTS = 3;
 export const VTO_JOB_TIMEOUT_MS = 90_000;
@@ -180,9 +186,15 @@ export interface VtoChainingProvider {
   checkTryOnStatus?(providerReference: string): Promise<VtoChainingPollOutcome>;
 }
 
+export interface VtoPipelineOptions {
+  pollIntervalMs?: number;
+  maxPollAttempts?: number;
+}
+
 export async function executeVtoPipeline(
   input: VtoPipelineInput,
   provider: VtoChainingProvider,
+  options?: VtoPipelineOptions,
 ): Promise<VtoPipelineResult> {
   const currentPersonUri = input.userPhotoUri;
   let step1ImageUri: string | null = null;
@@ -209,7 +221,6 @@ export async function executeVtoPipeline(
       outcome.status === 'queued';
 
     if (isCompleted) {
-      trackPaidExecutionAndDetectSpike('virtual_try_on', FASHN_CREDIT_COST_IDR);
       return {
         ok: true,
         imageUri: outcome.resultImageUri ?? outcome.resultPath ?? undefined,
@@ -221,13 +232,6 @@ export async function executeVtoPipeline(
     if (isProcessing && outcome.providerReference) {
       const pollFn = provider.pollTryOn ?? provider.checkTryOnStatus;
       if (!pollFn) {
-        recordOperationalEvent({
-          category: 'provider_job_failure',
-          severity: 'error',
-          code: 'POLLING_UNSUPPORTED',
-          message: 'Polling not supported by FASHN provider',
-          metadata: { provider: 'fashn', category },
-        });
         return {
           ok: false,
           cost: outcome.costEstimateUsd ?? 0,
@@ -235,59 +239,63 @@ export async function executeVtoPipeline(
           error: 'Polling not supported by provider',
         };
       }
-      const polled = await pollFn(outcome.providerReference);
-      const pollCompleted =
-        polled.kind === 'completed' || polled.status === 'completed';
-      if (pollCompleted) {
-        trackPaidExecutionAndDetectSpike(
-          'virtual_try_on',
-          FASHN_CREDIT_COST_IDR,
-        );
-        return {
-          ok: true,
-          imageUri:
-            polled.resultImageUri ??
-            polled.outputDataUri ??
-            polled.resultPath ??
-            undefined,
-          cost: outcome.costEstimateUsd ?? 0.075,
-          duration: (outcome.durationMs ?? 0) + (polled.durationMs ?? 0),
-        };
+
+      const pollIntervalMs =
+        options?.pollIntervalMs ?? (process.env.NODE_ENV === 'test' ? 10 : 1500);
+      const maxAttempts = options?.maxPollAttempts ?? 40;
+      let attempts = 0;
+      let lastPolledDuration = 0;
+
+      while (attempts < maxAttempts) {
+        attempts++;
+        if (attempts > 1 && pollIntervalMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
+        const polled = await pollFn(outcome.providerReference);
+        lastPolledDuration = polled.durationMs ?? 0;
+
+        const pollCompleted =
+          polled.kind === 'completed' || polled.status === 'completed';
+        if (pollCompleted) {
+          return {
+            ok: true,
+            imageUri:
+              polled.resultImageUri ??
+              polled.outputDataUri ??
+              polled.resultPath ??
+              undefined,
+            cost: outcome.costEstimateUsd ?? 0.075,
+            duration: (outcome.durationMs ?? 0) + lastPolledDuration,
+          };
+        }
+
+        const pollFailed =
+          polled.kind === 'failed' || polled.status === 'failed';
+        if (pollFailed) {
+          return {
+            ok: false,
+            cost: outcome.costEstimateUsd ?? 0,
+            duration: (outcome.durationMs ?? 0) + lastPolledDuration,
+            error:
+              polled.errorMessage ?? polled.error ?? 'Render gagal diproses',
+          };
+        }
       }
-      const pollFailed =
-        polled.kind === 'failed' || polled.status === 'failed';
-      const pollError = pollFailed
-        ? (polled.errorMessage ?? polled.error ?? 'Render gagal diproses')
-        : 'Masih diproses';
-      recordOperationalEvent({
-        category: 'provider_job_failure',
-        severity: 'error',
-        code: pollFailed ? 'FASHN_POLL_FAILED' : 'FASHN_POLL_TIMEOUT',
-        message: pollError,
-        metadata: { provider: 'fashn', category },
-      });
+
       return {
         ok: false,
         cost: outcome.costEstimateUsd ?? 0,
-        duration:
-          (outcome.durationMs ?? 0) + (pollFailed ? (polled.durationMs ?? 0) : 0),
-        error: pollError,
+        duration: (outcome.durationMs ?? 0) + lastPolledDuration,
+        error: 'Waktu proses Virtual Try-On habis (timeout)',
       };
     }
 
-    const stepError = outcome.errorMessage ?? 'Render gagal diproses';
-    recordOperationalEvent({
-      category: 'provider_job_failure',
-      severity: 'error',
-      code: 'FASHN_SUBMIT_FAILED',
-      message: stepError,
-      metadata: { provider: 'fashn', category },
-    });
     return {
       ok: false,
       cost: 0,
       duration: outcome.durationMs ?? 0,
-      error: stepError,
+      error: outcome.errorMessage ?? 'Render gagal diproses',
     };
   };
 
@@ -435,7 +443,9 @@ export interface VtoRepository {
 
 export interface FashnVtoProvider {
   submitTryOn(input: {
-    modelPhotoPath: string;
+    modelPhotoPath?: string;
+    personImagePath?: string;
+    modelImageDataUri?: string;
     garmentImagePath: string;
     category: string;
     idempotencyKey?: string;
@@ -491,7 +501,39 @@ export function createFashnRestProvider(
 ): FashnVtoProvider {
   return {
     async submitTryOn(input) {
-      const result = await submitFashnTryOn(input, { fetchImpl });
+      let modelImage =
+        input.modelImageDataUri ??
+        input.modelPhotoPath ??
+        input.personImagePath ??
+        '';
+      if (
+        modelImage &&
+        !modelImage.startsWith('http://') &&
+        !modelImage.startsWith('https://') &&
+        !modelImage.startsWith('data:')
+      ) {
+        try {
+          const photoStorage = createSupabasePhotoStorage();
+          const stored = await photoStorage.read(modelImage);
+          if (stored) {
+            modelImage = `data:${stored.mimeType};base64,${Buffer.from(stored.bytes).toString('base64')}`;
+          }
+        } catch {
+          // ignore storage read failure, submitFashnTryOn will validate
+        }
+      }
+
+      const result = await submitFashnTryOn(
+        {
+          ...input,
+          modelImageDataUri: modelImage.startsWith('data:')
+            ? modelImage
+            : input.modelImageDataUri,
+          modelPhotoPath: modelImage,
+          category: input.category ?? 'tops',
+        },
+        { fetchImpl },
+      );
       return {
         providerReference: result.providerReference,
         status: result.status,
@@ -810,15 +852,6 @@ export function createVirtualTryOnService(
       const errorCode =
         error instanceof FashnProviderError ? error.code : 'PROVIDER_ERROR';
 
-      recordOperationalEvent({
-        category: 'provider_job_failure',
-        severity: 'error',
-        code: errorCode,
-        message:
-          error instanceof Error ? error.message : 'FASHN VTO job failed',
-        metadata: { provider: 'fashn', jobId },
-      });
-
       if (repository.recordUsageEvent) {
         await repository.recordUsageEvent({
           id: createId(),
@@ -1074,6 +1107,89 @@ export function createVirtualTryOnService(
     return job;
   }
 
+  async function recordPipelineExecution(
+    input: RecordPipelineExecutionInput,
+  ): Promise<{ jobId: string }> {
+    const timestamp = now().toISOString();
+    const isSuccess =
+      input.pipelineResult.status === 'succeeded' ||
+      input.pipelineResult.status === 'partial_success';
+    const status: VtoJobStatus = isSuccess ? 'completed' : 'failed';
+
+    const existingJob = await repository.findByTokenId(input.tokenId);
+    let jobId: string;
+
+    if (existingJob) {
+      jobId = existingJob.id;
+      await repository.update(jobId, {
+        status,
+        attemptCount: existingJob.attemptCount + 1,
+        resultPath: input.pipelineResult.finalImageUri ?? existingJob.resultPath,
+        error: input.pipelineResult.errorMessage ?? null,
+        updatedAt: timestamp,
+      });
+    } else {
+      jobId = createId();
+      await repository.create({
+        id: jobId,
+        tokenId: input.tokenId,
+        type: 'virtual_try_on',
+        status,
+        attemptCount: 1,
+        tokenRecoveryStatus: 'not_needed',
+        input: {
+          analysis_id: '',
+          product_id: input.topProductId ?? input.bottomProductId ?? '',
+          photo_path: input.userPhotoUri,
+        },
+        resultPath: input.pipelineResult.finalImageUri ?? null,
+        provider: 'fashn',
+        providerReference: null,
+        error: input.pipelineResult.errorMessage ?? null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+    }
+
+    if (repository.recordUsageEvent) {
+      const creditsUsed =
+        (input.pipelineResult.quotaDeduction.top ? 1 : 0) +
+        (input.pipelineResult.quotaDeduction.bottom ? 1 : 0);
+
+      if (creditsUsed > 0) {
+        await repository.recordUsageEvent({
+          id: createId(),
+          jobId,
+          provider: 'fashn',
+          feature: 'virtual_try_on',
+          model: 'tryon-v1.6',
+          inputTokens: null,
+          outputTokens: null,
+          estimatedCostIdr: creditsUsed * FASHN_CREDIT_COST_IDR,
+          status: 'completed',
+          errorCode: null,
+          createdAt: timestamp,
+        });
+      } else if (!isSuccess) {
+        await repository.recordUsageEvent({
+          id: createId(),
+          jobId,
+          provider: 'fashn',
+          feature: 'virtual_try_on',
+          model: 'tryon-v1.6',
+          inputTokens: null,
+          outputTokens: null,
+          estimatedCostIdr: 0,
+          status: 'failed',
+          errorCode: input.pipelineResult.errorMessage ?? 'PROVIDER_ERROR',
+          createdAt: timestamp,
+        });
+      }
+    }
+
+    return { jobId };
+  }
+
   return {
     listActiveProducts,
     createJob: createOrRetryJob,
@@ -1081,6 +1197,7 @@ export function createVirtualTryOnService(
     processJob,
     syncJobStatus,
     getJob,
+    recordPipelineExecution,
   };
 }
 

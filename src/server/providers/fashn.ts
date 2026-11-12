@@ -2,7 +2,8 @@ import 'server-only';
 import { getRequiredEnv } from '@/server/env';
 
 export const FASHN_DEFAULT_MODEL = 'tryon-v1.6';
-export const FASHN_CREDIT_COST_IDR = 1_350;
+// 1 credit = Rp 142.264,12 / 100 credits ≈ Rp 1.423
+export const FASHN_CREDIT_COST_IDR = 1_423;
 export const FASHN_ESTIMATED_COST_IDR = FASHN_CREDIT_COST_IDR; // alias
 
 export type FashnCategory = 'tops' | 'bottoms' | 'one-pieces' | 'auto';

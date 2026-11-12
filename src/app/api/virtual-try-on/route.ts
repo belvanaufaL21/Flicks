@@ -4,7 +4,7 @@ import {
   isSupabaseConfigured,
 } from '@/server/dev/local-memory-store';
 import { enforcePaidWorkActive } from '@/server/security/kill-switch';
-import { enforceRateLimit } from '@/server/security/rate-limiter';
+import { createSupabasePhotoStorage } from '@/server/storage/private-photo-storage';
 import {
   createSupabaseTokenService,
   extractBearerToken,
@@ -17,19 +17,16 @@ import {
   executeVtoPipeline,
 } from '@/server/vto/virtual-try-on.service';
 
+export const maxDuration = 60;
+
 function errorResponse(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
 }
 
 export async function POST(request: Request) {
-  const rateLimited = enforceRateLimit(request, 'virtual_try_on');
-  if (rateLimited) {
-    return rateLimited;
-  }
-
-  const paused = await enforcePaidWorkActive();
-  if (paused) {
-    return paused;
+  const killSwitchResponse = await enforcePaidWorkActive();
+  if (killSwitchResponse) {
+    return killSwitchResponse;
   }
 
   if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
@@ -127,6 +124,33 @@ export async function POST(request: Request) {
       return errorResponse(400, 'INVALID_PHOTO', 'Invalid user photo path');
     }
 
+    let resolvedUserPhotoUri = userPhotoUri;
+    if (
+      !userPhotoUri.startsWith('http://') &&
+      !userPhotoUri.startsWith('https://') &&
+      !userPhotoUri.startsWith('data:')
+    ) {
+      try {
+        const photoStorage = createSupabasePhotoStorage();
+        const storedPhoto = await photoStorage.read(userPhotoUri);
+        if (storedPhoto) {
+          resolvedUserPhotoUri = `data:${storedPhoto.mimeType};base64,${Buffer.from(storedPhoto.bytes).toString('base64')}`;
+        } else {
+          return errorResponse(
+            400,
+            'PHOTO_NOT_FOUND',
+            'Foto seluruh tubuh tidak ditemukan di penyimpanan',
+          );
+        }
+      } catch (err) {
+        return errorResponse(
+          500,
+          'STORAGE_ERROR',
+          'Gagal membaca foto seluruh tubuh dari penyimpanan',
+        );
+      }
+    }
+
     const vtoService = createSupabaseVirtualTryOnService();
     const activeCatalog = await vtoService.listActiveProducts();
     const topProduct = topProductId
@@ -145,7 +169,7 @@ export async function POST(request: Request) {
 
     const pipelineResult = await executeVtoPipeline(
       {
-        userPhotoUri,
+        userPhotoUri: resolvedUserPhotoUri,
         topProduct,
         bottomProduct,
       },
@@ -156,6 +180,18 @@ export async function POST(request: Request) {
       consumeTop: pipelineResult.quotaDeduction.top,
       consumeBottom: pipelineResult.quotaDeduction.bottom,
     });
+
+    await vtoService
+      .recordPipelineExecution({
+        tokenId: resolvedTokenId,
+        topProductId,
+        bottomProductId,
+        userPhotoUri: resolvedUserPhotoUri,
+        pipelineResult,
+      })
+      .catch((err) => {
+        console.error('[VTO] Failed to record job and usage event:', err);
+      });
 
     return NextResponse.json(
       {
