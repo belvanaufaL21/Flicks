@@ -110,6 +110,27 @@ alter table public.products force row level security;
 revoke all on table public.products from public, anon, authenticated;
 grant all on table public.products to service_role;
 
+-- Storage Bucket for Public Product Catalog Images
+insert into storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+values (
+  'product-images',
+  'product-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = true,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 -- 5. ASYNC AI & VTO JOBS
 create table if not exists public.jobs (
   id uuid primary key,
