@@ -46,6 +46,11 @@ export interface RecommendedCatalogItem {
   sourceUrl?: string | null;
 }
 
+export interface PurchasedTokenCredential {
+  tokenId: string;
+  tokenSecret: string;
+}
+
 export interface PhotoIntakeFormProps {
   initialAnalysisComplete?: {
     gender: string;
@@ -54,6 +59,8 @@ export interface PhotoIntakeFormProps {
     userPhotoUri: string;
     tokenId: string;
   };
+  purchasedToken?: PurchasedTokenCredential | null;
+  requirePurchasedToken?: boolean;
 }
 
 type PhotoSlots = Record<PhotoKind, SelectedPhoto | null>;
@@ -80,7 +87,11 @@ function validationMessage(code: string): string {
 
 export function PhotoIntakeForm({
   initialAnalysisComplete,
+  purchasedToken = null,
+  requirePurchasedToken = false,
 }: PhotoIntakeFormProps = {}) {
+  const isCheckoutLocked = requirePurchasedToken && !purchasedToken;
+  const currentTokenKey = purchasedToken?.tokenId ?? null;
   const [photos, setPhotos] = useState<PhotoSlots>(initialPhotos);
   const [errors, setErrors] = useState<PhotoErrors>({});
   const [status, setStatus] = useState('');
@@ -95,14 +106,34 @@ export function PhotoIntakeForm({
   } | null>(null);
   const [selectedTopId, setSelectedTopId] = useState<string | null>(null);
   const [selectedBottomId, setSelectedBottomId] = useState<string | null>(null);
-  const [vtoQuota, setVtoQuota] = useState({
-    canTryTop: true,
-    canTryBottom: true,
+  const [vtoState, setVtoState] = useState<{
+    tokenKey: string | null;
+    quota: { canTryTop: boolean; canTryBottom: boolean };
+    outputUri: string | null;
+    warning: string | null;
+    stepMessage: string | null;
+  }>({
+    tokenKey: currentTokenKey,
+    quota: { canTryTop: true, canTryBottom: true },
+    outputUri: null,
+    warning: null,
+    stepMessage: null,
   });
+  const activeVto =
+    vtoState.tokenKey === currentTokenKey
+      ? vtoState
+      : {
+          tokenKey: currentTokenKey,
+          quota: { canTryTop: true, canTryBottom: true },
+          outputUri: null,
+          warning: null,
+          stepMessage: null,
+        };
+  const vtoQuota = activeVto.quota;
+  const vtoOutputUri = activeVto.outputUri;
+  const vtoWarning = activeVto.warning;
+  const vtoStepMessage = activeVto.stepMessage;
   const [vtoRunning, setVtoRunning] = useState(false);
-  const [vtoStepMessage, setVtoStepMessage] = useState<string | null>(null);
-  const [vtoOutputUri, setVtoOutputUri] = useState<string | null>(null);
-  const [vtoWarning, setVtoWarning] = useState<string | null>(null);
   const [activeTokenSecret, setActiveTokenSecret] = useState<string | null>(
     initialAnalysisComplete?.tokenId ?? null,
   );
@@ -210,22 +241,43 @@ export function PhotoIntakeForm({
   }
 
   async function runLiveGeminiAnalysis() {
-    if (!ready || !consent || !gender || !photos.face || !photos.fullBody)
+    if (
+      isCheckoutLocked ||
+      !ready ||
+      !consent ||
+      !gender ||
+      !photos.face ||
+      !photos.fullBody
+    ) {
       return;
+    }
     setAnalyzing(true);
     setAnalysisResult(null);
-    setStatus('Menyiapkan token dev dan mengunggah foto ke server lokal...');
+    setStatus(
+      purchasedToken?.tokenSecret
+        ? 'Mengunggah foto privat dengan token aktif...'
+        : 'Menyiapkan token dev dan mengunggah foto ke server lokal...',
+    );
 
     try {
-      const tokenRes = await fetch('/api/dev/tokens?count=1');
-      const tokenJson = (await tokenRes.json()) as {
-        tokens?: Array<{ secret: string }>;
-        message?: string;
-      };
-      const secret = tokenJson.tokens?.[0]?.secret;
-      if (!tokenRes.ok || !secret) {
-        setStatus(tokenJson.message || 'Gagal membuat token dev.');
-        return;
+      let secret = purchasedToken?.tokenSecret;
+      if (!secret) {
+        if (requirePurchasedToken) {
+          setStatus(
+            'Token analisis belum aktif. Selesaikan pembayaran Rp19.000 terlebih dahulu.',
+          );
+          return;
+        }
+        const tokenRes = await fetch('/api/dev/tokens?count=1');
+        const tokenJson = (await tokenRes.json()) as {
+          tokens?: Array<{ secret: string }>;
+          message?: string;
+        };
+        secret = tokenJson.tokens?.[0]?.secret;
+        if (!tokenRes.ok || !secret) {
+          setStatus(tokenJson.message || 'Gagal membuat token dev.');
+          return;
+        }
       }
 
       const authHeader = { authorization: `Bearer ${secret}` };
@@ -353,20 +405,27 @@ export function PhotoIntakeForm({
     if (!selectedTopId && !selectedBottomId) return;
     if (vtoRunning) return;
 
+    const requestTokenKey = currentTokenKey;
     setVtoRunning(true);
-    setVtoWarning(null);
-    setVtoStepMessage(
-      selectedTopId && selectedBottomId
-        ? 'Langkah 1/2: Memasang pakaian atasan pilihan Anda...'
-        : 'Memproses simulasi Virtual Try-On...',
-    );
+    setVtoState({
+      tokenKey: requestTokenKey,
+      quota: vtoQuota,
+      outputUri: vtoOutputUri,
+      warning: null,
+      stepMessage:
+        selectedTopId && selectedBottomId
+          ? 'Langkah 1/2: Memasang pakaian atasan pilihan Anda...'
+          : 'Memproses simulasi Virtual Try-On...',
+    });
 
     try {
+      const tokenSecretForAuth =
+        purchasedToken?.tokenSecret ?? activeTokenSecret;
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (activeTokenSecret) {
-        headers.authorization = `Bearer ${activeTokenSecret}`;
+      if (tokenSecretForAuth) {
+        headers.authorization = `Bearer ${tokenSecretForAuth}`;
       }
 
       const res = await fetch('/api/virtual-try-on', {
@@ -381,7 +440,10 @@ export function PhotoIntakeForm({
             photos.fullBody?.previewUrl ||
             'full-body/demo-photo',
           token_id:
-            initialAnalysisComplete?.tokenId || activeTokenSecret || 'demo-token',
+            purchasedToken?.tokenId ||
+            initialAnalysisComplete?.tokenId ||
+            activeTokenSecret ||
+            'demo-token',
         }),
       });
       const data = (await res.json()) as {
@@ -389,23 +451,39 @@ export function PhotoIntakeForm({
         quota?: { canTryTop: boolean; canTryBottom: boolean };
         warning_message?: string | null;
       };
-      if (data.result_image_uri) {
-        setVtoOutputUri(data.result_image_uri);
-      }
-      if (data.quota) {
-        setVtoQuota({
-          canTryTop: data.quota.canTryTop,
-          canTryBottom: data.quota.canTryBottom,
-        });
-      }
-      if (data.warning_message) {
-        setVtoWarning(data.warning_message);
-      }
+      setVtoState((prev) => {
+        const base =
+          prev.tokenKey === requestTokenKey
+            ? prev
+            : {
+                tokenKey: requestTokenKey,
+                quota: { canTryTop: true, canTryBottom: true },
+                outputUri: null,
+                warning: null,
+                stepMessage: null,
+              };
+        return {
+          tokenKey: requestTokenKey,
+          quota: data.quota
+            ? {
+                canTryTop: data.quota.canTryTop,
+                canTryBottom: data.quota.canTryBottom,
+              }
+            : base.quota,
+          outputUri: data.result_image_uri ?? base.outputUri,
+          warning: data.warning_message ?? base.warning,
+          stepMessage: null,
+        };
+      });
       setSelectedTopId(null);
       setSelectedBottomId(null);
     } finally {
       setVtoRunning(false);
-      setVtoStepMessage(null);
+      setVtoState((prev) =>
+        prev.tokenKey === requestTokenKey
+          ? { ...prev, stepMessage: null }
+          : prev,
+      );
     }
   }
 
@@ -415,13 +493,28 @@ export function PhotoIntakeForm({
         <p className={styles.eyebrow}>FLICKS LITE · PHOTO INTAKE</p>
         <h1>Mulai dengan fotomu</h1>
         <p className={styles.intro}>
-          Pilih satu foto wajah dan satu foto seluruh tubuh untuk melihat demo
-          proses intake.
+          {requirePurchasedToken
+            ? 'Pilih satu foto wajah dan satu foto seluruh tubuh untuk menjalankan analisis Personal Color, Body Shape, dan Virtual Try-On.'
+            : 'Pilih satu foto wajah dan satu foto seluruh tubuh untuk melihat demo proses intake.'}
         </p>
       </header>
-      <p className={styles.notice}>
-        Demo lokal: foto tidak dikirim ke server dan tidak disimpan.
-      </p>
+      {requirePurchasedToken ? (
+        isCheckoutLocked ? (
+          <p className={styles.lockNotice} role="note">
+            Token analisis belum aktif. Selesaikan pembayaran Rp19.000 via QRIS
+            / GoPay di atas untuk mengaktifkan token unggah foto dan analisis AI.
+          </p>
+        ) : (
+          <p className={styles.unlockedNotice} role="status">
+            Token analisis aktif ({purchasedToken?.tokenId}). Silakan unggah foto
+            wajah dan seluruh tubuh Anda di bawah ini.
+          </p>
+        )
+      ) : (
+        <p className={styles.notice}>
+          Demo lokal: foto tidak dikirim ke server dan tidak disimpan.
+        </p>
+      )}
       <section className={styles.slots} aria-label="Foto untuk demo">
         {(['face', 'fullBody'] as const).map((kind) => {
           const photo = photos[kind];
@@ -457,9 +550,17 @@ export function PhotoIntakeForm({
                   </div>
                 </div>
               ) : (
-                <label className={styles.dropzone} htmlFor={inputId}>
+                <label
+                  aria-disabled={isCheckoutLocked ? 'true' : undefined}
+                  className={`${styles.dropzone} ${isCheckoutLocked ? styles.dropzoneDisabled : ''}`}
+                  htmlFor={inputId}
+                >
                   <span aria-hidden="true">＋</span>
-                  <span>Pilih foto</span>
+                  <span>
+                    {isCheckoutLocked
+                      ? 'Selesaikan pembayaran untuk unggah foto'
+                      : 'Pilih foto'}
+                  </span>
                   <span>JPEG, PNG, atau WebP · maksimal 10 MB</span>
                 </label>
               )}
@@ -467,6 +568,7 @@ export function PhotoIntakeForm({
                 accept="image/jpeg,image/png,image/webp"
                 aria-label={title}
                 className={styles.fileInput}
+                disabled={isCheckoutLocked}
                 id={inputId}
                 onChange={(event) => void handleFileChange(kind, event)}
                 type="file"
@@ -480,24 +582,27 @@ export function PhotoIntakeForm({
           );
         })}
       </section>
-      <button
-        className={styles.submit}
-        disabled={!ready}
-        onClick={simulateUpload}
-        type="button"
-      >
-        Simulasikan upload
-      </button>
+      {!requirePurchasedToken && (
+        <button
+          className={styles.submit}
+          disabled={!ready}
+          onClick={simulateUpload}
+          type="button"
+        >
+          Simulasikan upload
+        </button>
+      )}
       <fieldset className={styles.genderFieldset}>
         <legend className={styles.genderLegend}>
           Pilih Profil Analisis Body Shape
         </legend>
         <div className={styles.genderRadioGroup}>
           <label
-            className={`${styles.genderOption} ${gender === 'male' ? styles.genderSelected : ''}`}
+            className={`${styles.genderOption} ${gender === 'male' ? styles.genderSelected : ''} ${isCheckoutLocked ? styles.genderOptionDisabled : ''}`}
           >
             <input
               checked={gender === 'male'}
+              disabled={isCheckoutLocked}
               name="gender"
               onChange={() => setGender('male')}
               type="radio"
@@ -509,10 +614,11 @@ export function PhotoIntakeForm({
             <span>Pria (Menswear)</span>
           </label>
           <label
-            className={`${styles.genderOption} ${gender === 'female' ? styles.genderSelected : ''}`}
+            className={`${styles.genderOption} ${gender === 'female' ? styles.genderSelected : ''} ${isCheckoutLocked ? styles.genderOptionDisabled : ''}`}
           >
             <input
               checked={gender === 'female'}
+              disabled={isCheckoutLocked}
               name="gender"
               onChange={() => setGender('female')}
               type="radio"
@@ -525,10 +631,14 @@ export function PhotoIntakeForm({
           </label>
         </div>
       </fieldset>
-      <div style={{ marginTop: '1rem' }}>
+      <div
+        className={requirePurchasedToken ? styles.liveActionWrap : undefined}
+        style={requirePurchasedToken ? undefined : { marginTop: '1rem' }}
+      >
         <label style={{ display: 'block', marginBottom: '0.5rem' }}>
           <input
             checked={consent}
+            disabled={isCheckoutLocked}
             onChange={(event) => setConsent(event.currentTarget.checked)}
             type="checkbox"
           />{' '}
@@ -536,14 +646,18 @@ export function PhotoIntakeForm({
           Privasi
         </label>
         <button
-          className={styles.secondaryAction}
-          disabled={!ready || !consent || !gender || analyzing}
+          className={
+            requirePurchasedToken ? styles.submit : styles.secondaryAction
+          }
+          disabled={isCheckoutLocked || !ready || !consent || !gender || analyzing}
           onClick={() => void runLiveGeminiAnalysis()}
           type="button"
         >
           {analyzing
             ? 'Memproses dengan Gemini...'
-            : 'Analisis dengan Gemini AI (Mode Dev)'}
+            : requirePurchasedToken
+              ? 'Analisis dengan Gemini AI'
+              : 'Analisis dengan Gemini AI (Mode Dev)'}
         </button>
       </div>
       <p aria-live="polite" className={styles.status} role="status">
@@ -725,7 +839,10 @@ export function PhotoIntakeForm({
             {!vtoQuota.canTryTop && !vtoQuota.canTryBottom ? (
               <div className={styles.upsellBanner}>
                 <p>Kuota Virtual Try-On sesi ini telah habis (0/1 Atasan, 0/1 Bawahan).</p>
-                <a href="/checkout" className={styles.upsellBtn}>
+                <a
+                  href={requirePurchasedToken ? '#checkout-section' : '/checkout'}
+                  className={styles.upsellBtn}
+                >
                   Tambah Kuota Try-On
                 </a>
               </div>

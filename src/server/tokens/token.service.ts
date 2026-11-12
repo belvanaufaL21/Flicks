@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import {
   canUseLocalDevFallback,
@@ -68,6 +68,32 @@ export function hashTokenSecret(secret: string): string {
   return createHash('sha256').update(secret, 'utf8').digest('hex');
 }
 
+// ponytail: deterministic per-payment HMAC avoids a DB schema migration; migrate to encrypted column if key rotation is added
+function derivePaymentTokenSecret(paymentId: string): string | null {
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.MIDTRANS_SERVER_KEY?.trim() ||
+    (process.env.NODE_ENV !== 'production'
+      ? 'flicks-dev-payment-token-secret-key'
+      : '');
+  if (!key) {
+    return null;
+  }
+
+  return createHmac('sha256', key)
+    .update(`flicks-payment-token:${paymentId}`, 'utf8')
+    .digest('hex');
+}
+
+function matchesSecretHash(secret: string, expectedHash: string): boolean {
+  const candidate = Buffer.from(hashTokenSecret(secret), 'utf8');
+  const expected = Buffer.from(expectedHash, 'utf8');
+  return (
+    candidate.length === expected.length &&
+    timingSafeEqual(candidate, expected)
+  );
+}
+
 export function extractBearerToken(
   authorizationHeader: string | null,
 ): string | null {
@@ -84,9 +110,11 @@ export function createTokenService(
   options: TokenServiceOptions = {},
 ) {
   const createId = options.createId ?? (() => crypto.randomUUID());
+  const hasCustomSecretGenerator = Boolean(options.createSecret);
   const createSecret =
     options.createSecret ?? (() => randomBytes(24).toString('hex'));
   const now = options.now ?? (() => new Date());
+  const issuedSecretsByPaymentId = new Map<string, string>();
 
   return {
     async createDevTokens(count = 1): Promise<IssuedDevToken[]> {
@@ -255,13 +283,37 @@ export function createTokenService(
         throw new Error('Token repository does not support payment token issuance');
       }
 
+      const resolveAvailableSecret = (
+        existing: TokenRecord,
+      ): string | undefined => {
+        if (existing.status !== 'available') {
+          issuedSecretsByPaymentId.delete(paymentId);
+          return undefined;
+        }
+        const cached = issuedSecretsByPaymentId.get(paymentId);
+        if (cached && matchesSecretHash(cached, existing.secretHash)) {
+          return cached;
+        }
+        const derived = derivePaymentTokenSecret(paymentId);
+        if (derived && matchesSecretHash(derived, existing.secretHash)) {
+          return derived;
+        }
+        return undefined;
+      };
+
       const existing = await repository.findByPaymentId(paymentId);
       if (existing) {
-        return { token: existing, idempotent: true };
+        return {
+          token: existing,
+          secret: resolveAvailableSecret(existing),
+          idempotent: true,
+        };
       }
 
       const id = createId();
-      const secret = createSecret();
+      const secret = hasCustomSecretGenerator
+        ? createSecret()
+        : (derivePaymentTokenSecret(paymentId) ?? createSecret());
       const record: TokenRecord = {
         id,
         secretHash: hashTokenSecret(secret),
@@ -274,11 +326,18 @@ export function createTokenService(
 
       try {
         await repository.createMany([record]);
+        if (hasCustomSecretGenerator) {
+          issuedSecretsByPaymentId.set(paymentId, secret);
+        }
         return { token: record, secret, idempotent: false };
       } catch (error) {
         const concurrent = await repository.findByPaymentId(paymentId);
         if (concurrent) {
-          return { token: concurrent, idempotent: true };
+          return {
+            token: concurrent,
+            secret: resolveAvailableSecret(concurrent),
+            idempotent: true,
+          };
         }
         throw error;
       }

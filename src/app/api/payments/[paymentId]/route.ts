@@ -22,12 +22,12 @@ export async function GET(
 
   try {
     const { paymentId } = await context.params;
-    const payment =
-      await createSupabaseMidtransService().getVerifiedPaymentStatus(
+    const result =
+      await createSupabaseMidtransService().getVerifiedPaymentWithToken(
         paymentId,
       );
 
-    if (!payment) {
+    if (!result) {
       return errorResponse(
         404,
         'PAYMENT_NOT_FOUND',
@@ -35,17 +35,28 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(
-      {
-        payment_id: payment.id,
-        provider_reference: payment.providerReference,
-        amount: payment.amount,
-        currency: payment.currency,
-        status: payment.status,
-        paid_at: payment.paidAt,
-      },
-      { status: 200 },
-    );
+    const { payment, tokenId, tokenSecret } = result;
+    const basePayload = {
+      payment_id: payment.id,
+      provider_reference: payment.providerReference,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+      paid_at: payment.paidAt,
+    };
+
+    if (payment.status === 'paid') {
+      return NextResponse.json(
+        {
+          ...basePayload,
+          token_id: tokenId,
+          token_secret: tokenSecret,
+        },
+        { status: 200 },
+      );
+    }
+
+    return NextResponse.json(basePayload, { status: 200 });
   } catch {
     return errorResponse(
       500,

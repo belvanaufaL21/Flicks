@@ -58,6 +58,32 @@
   font-size: 0.9rem;
 }
 
+.lockNotice {
+  width: min(100% - 2rem, 960px);
+  margin: 1.5rem 0;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid #fcd34d;
+  border-radius: 0.75rem;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.unlockedNotice {
+  width: min(100% - 2rem, 960px);
+  margin: 1.5rem 0;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.75rem;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .slots {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -96,6 +122,12 @@
   gap: 0.5rem;
   cursor: pointer;
   text-align: center;
+}
+
+.dropzoneDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .dropzone span:first-child {
@@ -242,6 +274,16 @@
 .genderSelected {
   border-color: #29392b;
   background: #f3f6ef;
+}
+
+.genderOptionDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.liveActionWrap {
+  width: min(100% - 2rem, 960px);
+  margin-top: 1rem;
 }
 
 .genderIcon {

@@ -150,21 +150,21 @@ describe('Midtrans QRIS checkout, webhook verification, and status (Tasks 1.2–
   });
 
   describe('Checkout, Webhook, and Status API routes (1.2–1.5)', () => {
-    const createPendingQrisTransaction = vi.fn();
+    const createSnapTransaction = vi.fn();
     const handleNotification = vi.fn();
-    const getVerifiedPaymentStatus = vi.fn();
+    const getVerifiedPaymentWithToken = vi.fn();
 
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
       vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
       vi.stubEnv('MIDTRANS_SERVER_KEY', 'midtrans-server-secret');
-      createPendingQrisTransaction.mockReset();
+      createSnapTransaction.mockReset();
       handleNotification.mockReset();
-      getVerifiedPaymentStatus.mockReset();
+      getVerifiedPaymentWithToken.mockReset();
       createSupabaseMidtransService.mockReturnValue({
-        createPendingQrisTransaction,
+        createSnapTransaction,
         handleNotification,
-        getVerifiedPaymentStatus,
+        getVerifiedPaymentWithToken,
       });
     });
 
@@ -173,14 +173,16 @@ describe('Midtrans QRIS checkout, webhook verification, and status (Tasks 1.2–
       vi.clearAllMocks();
     });
 
-    it('creates pending QRIS checkout and returns verified server payment status ignoring client status params (1.2, 1.5, QA-09)', async () => {
-      createPendingQrisTransaction.mockResolvedValueOnce({
+    it('creates pending Snap checkout and returns verified server payment status ignoring client status params (1.2, 1.5, QA-09)', async () => {
+      createSnapTransaction.mockResolvedValueOnce({
         id: 'pay-1',
         providerReference: 'flicks-pay-1',
         amount: 19000,
         currency: 'IDR',
         status: 'pending',
-        qrisUrl: 'https://api.sandbox.midtrans.com/qris/qr',
+        snapToken: 'snap-tok-1',
+        redirectUrl: 'https://app.sandbox.midtrans.com/snap/v4/redirection/1',
+        qrisUrl: 'https://app.sandbox.midtrans.com/snap/v4/redirection/1',
         paidAt: null,
       });
 
@@ -192,21 +194,27 @@ describe('Midtrans QRIS checkout, webhook verification, and status (Tasks 1.2–
         amount: 19000,
         currency: 'IDR',
         status: 'pending',
-        qris_url: 'https://api.sandbox.midtrans.com/qris/qr',
+        snap_token: 'snap-tok-1',
+        redirect_url: 'https://app.sandbox.midtrans.com/snap/v4/redirection/1',
+        qris_url: 'https://app.sandbox.midtrans.com/snap/v4/redirection/1',
       });
 
-      getVerifiedPaymentStatus.mockResolvedValueOnce({
-        id: 'pay-1',
-        providerReference: 'flicks-pay-1',
-        amount: 19000,
-        currency: 'IDR',
-        status: 'pending',
-        paidAt: null,
+      getVerifiedPaymentWithToken.mockResolvedValueOnce({
+        payment: {
+          id: 'pay-1',
+          providerReference: 'flicks-pay-1',
+          amount: 19000,
+          currency: 'IDR',
+          status: 'pending',
+          paidAt: null,
+        },
+        tokenId: null,
+        tokenSecret: null,
       });
 
       const statusRes = await paymentStatusGET(
         new Request('http://localhost/api/payments/pay-1?status=paid'),
-        { params: { paymentId: 'pay-1' } },
+        { params: Promise.resolve({ paymentId: 'pay-1' }) },
       );
       expect(statusRes.status).toBe(200);
       await expect(statusRes.json()).resolves.toEqual({
@@ -230,6 +238,37 @@ describe('Midtrans QRIS checkout, webhook verification, and status (Tasks 1.2–
         }),
       );
       expect(badWebhookRes.status).toBe(401);
+    });
+
+    it('accepts webhook requests when MIDTRANS_SIGNATURE_KEY is configured even without MIDTRANS_SERVER_KEY', async () => {
+      vi.stubEnv('MIDTRANS_SERVER_KEY', '');
+      vi.stubEnv('MIDTRANS_SIGNATURE_KEY', 'midtrans-signature-secret');
+
+      handleNotification.mockResolvedValueOnce({
+        ok: true,
+        payment: {
+          id: 'pay-sig-route',
+          providerReference: 'flicks-pay-sig-route',
+          status: 'paid',
+        },
+        tokenId: 'tok-sig-route',
+        idempotent: false,
+      });
+
+      const res = await webhookPOST(
+        new Request('http://localhost/api/webhooks/midtrans', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ order_id: 'flicks-pay-sig-route' }),
+        }),
+      );
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        payment_id: 'pay-sig-route',
+        status: 'paid',
+        token_id: 'tok-sig-route',
+      });
     });
   });
 });

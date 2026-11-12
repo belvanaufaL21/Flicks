@@ -26,7 +26,7 @@ export async function POST(request?: Request) {
 
   try {
     const payment =
-      await createSupabaseMidtransService().createPendingQrisTransaction();
+      await createSupabaseMidtransService().createSnapTransaction();
 
     return NextResponse.json(
       {
@@ -35,7 +35,9 @@ export async function POST(request?: Request) {
         amount: payment.amount,
         currency: payment.currency,
         status: payment.status,
-        qris_url: payment.qrisUrl,
+        snap_token: payment.snapToken,
+        redirect_url: payment.redirectUrl,
+        qris_url: payment.redirectUrl,
       },
       { status: 201 },
     );
@@ -43,7 +45,7 @@ export async function POST(request?: Request) {
     return errorResponse(
       502,
       'PROVIDER_ERROR',
-      'Failed to create Midtrans QRIS transaction',
+      'Failed to create Midtrans Snap transaction',
     );
   }
 }
