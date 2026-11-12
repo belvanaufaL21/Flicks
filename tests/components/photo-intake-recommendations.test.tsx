@@ -199,4 +199,114 @@ describe('PhotoIntakeForm - Catalog Recommendations & Dual-Quota VTO', () => {
       expect(screen.getByText('Hourglass Structured Blazer')).toBeDefined();
     });
   });
+
+  it('enforces single-credit locking: mutual exclusivity, disables selection & CTA when completed', async () => {
+    sessionStorage.clear();
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/recommendations')) {
+        return new Response(
+          JSON.stringify({
+            recommendations: {
+              tops: [
+                {
+                  id: 'top-lock-1',
+                  name: 'Oversized Silk Shirt',
+                  brand: 'FLICKS',
+                  category: 'tops',
+                  imagePath: 'https://storage/silk.jpg',
+                },
+              ],
+              bottoms: [
+                {
+                  id: 'bot-lock-1',
+                  name: 'Pleated Trousers',
+                  brand: 'FLICKS',
+                  category: 'bottoms',
+                  imagePath: 'https://storage/pleated.jpg',
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/api/virtual-try-on')) {
+        return new Response(
+          JSON.stringify({
+            status: 'succeeded',
+            result_image_uri: 'https://fashn.cdn/output_single_locked.jpg',
+            quota: {
+              canTryTop: false,
+              canTryBottom: false,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <PhotoIntakeForm
+        initialAnalysisComplete={{
+          gender: 'female',
+          bodyShape: 'hourglass',
+          colorSeason: 'spring',
+          userPhotoUri: 'https://storage/user.jpg',
+          tokenId: 'tok-single-lock',
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Oversized Silk Shirt')).toBeDefined();
+      expect(screen.getByText('Pleated Trousers')).toBeDefined();
+    });
+
+    const topBtn = screen.getByRole('button', {
+      name: /Pilih Atasan: Oversized Silk Shirt/i,
+    });
+    const botBtn = screen.getByRole('button', {
+      name: /Pilih Bawahan: Pleated Trousers/i,
+    });
+
+    // Select Top
+    fireEvent.click(topBtn);
+    expect(topBtn.textContent).toContain('Terpilih ✓');
+
+    // Select Bottom -> mutually exclusive (clears top)
+    fireEvent.click(botBtn);
+    expect(botBtn.textContent).toContain('Terpilih ✓');
+    expect(topBtn.textContent).not.toContain('Terpilih ✓');
+
+    const ctaBtn = screen.getByRole('button', {
+      name: /COBA VIRTUAL TRY-ON SEKARANG/i,
+    });
+    fireEvent.click(ctaBtn);
+
+    // After completion, button is permanently locked
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', {
+          name: /VIRTUAL TRY-ON SELESAI \(1\/1 DIGUNAKAN\) ✓/i,
+        }),
+      ).toBeDefined();
+    });
+
+    const completedCta = screen.getByRole('button', {
+      name: /VIRTUAL TRY-ON SELESAI \(1\/1 DIGUNAKAN\) ✓/i,
+    }) as HTMLButtonElement;
+    expect(completedCta.disabled).toBe(true);
+
+    // Catalog selection buttons are disabled
+    expect((topBtn as HTMLButtonElement).disabled).toBe(true);
+    expect((botBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // Verify persisted in sessionStorage
+    expect(
+      sessionStorage.getItem('flicks_vto_tok-single-lock'),
+    ).toBe('https://fashn.cdn/output_single_locked.jpg');
+  });
 });

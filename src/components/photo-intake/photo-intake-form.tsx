@@ -90,8 +90,6 @@ export function PhotoIntakeForm({
   purchasedToken = null,
   requirePurchasedToken = false,
 }: PhotoIntakeFormProps = {}) {
-  const isCheckoutLocked = requirePurchasedToken && !purchasedToken;
-  const currentTokenKey = purchasedToken?.tokenId ?? null;
   const [photos, setPhotos] = useState<PhotoSlots>(initialPhotos);
   const [errors, setErrors] = useState<PhotoErrors>({});
   const [status, setStatus] = useState('');
@@ -106,34 +104,14 @@ export function PhotoIntakeForm({
   } | null>(null);
   const [selectedTopId, setSelectedTopId] = useState<string | null>(null);
   const [selectedBottomId, setSelectedBottomId] = useState<string | null>(null);
-  const [vtoState, setVtoState] = useState<{
-    tokenKey: string | null;
-    quota: { canTryTop: boolean; canTryBottom: boolean };
-    outputUri: string | null;
-    warning: string | null;
-    stepMessage: string | null;
-  }>({
-    tokenKey: currentTokenKey,
-    quota: { canTryTop: true, canTryBottom: true },
-    outputUri: null,
-    warning: null,
-    stepMessage: null,
+  const [vtoQuota, setVtoQuota] = useState({
+    canTryTop: true,
+    canTryBottom: true,
   });
-  const activeVto =
-    vtoState.tokenKey === currentTokenKey
-      ? vtoState
-      : {
-          tokenKey: currentTokenKey,
-          quota: { canTryTop: true, canTryBottom: true },
-          outputUri: null,
-          warning: null,
-          stepMessage: null,
-        };
-  const vtoQuota = activeVto.quota;
-  const vtoOutputUri = activeVto.outputUri;
-  const vtoWarning = activeVto.warning;
-  const vtoStepMessage = activeVto.stepMessage;
   const [vtoRunning, setVtoRunning] = useState(false);
+  const [vtoStepMessage, setVtoStepMessage] = useState<string | null>(null);
+  const [vtoOutputUri, setVtoOutputUri] = useState<string | null>(null);
+  const [vtoWarning, setVtoWarning] = useState<string | null>(null);
   const [activeTokenSecret, setActiveTokenSecret] = useState<string | null>(
     initialAnalysisComplete?.tokenId ?? null,
   );
@@ -141,6 +119,16 @@ export function PhotoIntakeForm({
     string | null
   >(initialAnalysisComplete?.userPhotoUri ?? null);
   const ready = photos.face !== null && photos.fullBody !== null;
+  const isCheckoutLocked = requirePurchasedToken && !purchasedToken;
+
+  useEffect(() => {
+    if (!purchasedToken) return;
+    setActiveTokenSecret(purchasedToken.tokenSecret);
+    setVtoQuota({ canTryTop: true, canTryBottom: true });
+    setVtoOutputUri(null);
+    setVtoWarning(null);
+    setVtoStepMessage(null);
+  }, [purchasedToken]);
 
   useEffect(() => {
     if (!initialAnalysisComplete) return;
@@ -177,6 +165,23 @@ export function PhotoIntakeForm({
     };
   }, [initialAnalysisComplete]);
 
+  useEffect(() => {
+    const activeToken =
+      purchasedToken?.tokenId ||
+      initialAnalysisComplete?.tokenId ||
+      activeTokenSecret;
+    if (!activeToken || typeof window === 'undefined') return;
+    try {
+      const cached = sessionStorage.getItem(`flicks_vto_${activeToken}`);
+      if (cached) {
+        setVtoOutputUri(cached);
+        setVtoQuota({ canTryTop: false, canTryBottom: false });
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [purchasedToken?.tokenId, initialAnalysisComplete?.tokenId, activeTokenSecret]);
+
   useEffect(
     () => () => {
       Object.values(photos).forEach((photo) => {
@@ -190,6 +195,10 @@ export function PhotoIntakeForm({
     kind: PhotoKind,
     event: ChangeEvent<HTMLInputElement>,
   ) {
+    if (isCheckoutLocked) {
+      event.currentTarget.value = '';
+      return;
+    }
     const files = event.currentTarget.files;
     const fileCount = files?.length ?? 0;
     const file = files?.[0];
@@ -403,22 +412,20 @@ export function PhotoIntakeForm({
 
   async function handleRunDualQuotaVto() {
     if (!selectedTopId && !selectedBottomId) return;
-    if (vtoRunning) return;
+    if (vtoRunning || vtoOutputUri) return;
 
-    const requestTokenKey = currentTokenKey;
     setVtoRunning(true);
-    setVtoState({
-      tokenKey: requestTokenKey,
-      quota: vtoQuota,
-      outputUri: vtoOutputUri,
-      warning: null,
-      stepMessage:
-        selectedTopId && selectedBottomId
-          ? 'Langkah 1/2: Memasang pakaian atasan pilihan Anda...'
-          : 'Memproses simulasi Virtual Try-On...',
-    });
+    setVtoWarning(null);
+    setVtoStepMessage(
+      'Sedang memproses simulasi Virtual Try-On AI via FASHN. Mohon tunggu, proses memakan waktu ~15-30 detik...',
+    );
 
     try {
+      const activeToken =
+        purchasedToken?.tokenId ||
+        initialAnalysisComplete?.tokenId ||
+        activeTokenSecret ||
+        'demo-token';
       const tokenSecretForAuth =
         purchasedToken?.tokenSecret ?? activeTokenSecret;
       const headers: Record<string, string> = {
@@ -439,51 +446,47 @@ export function PhotoIntakeForm({
             initialAnalysisComplete?.userPhotoUri ||
             photos.fullBody?.previewUrl ||
             'full-body/demo-photo',
-          token_id:
-            purchasedToken?.tokenId ||
-            initialAnalysisComplete?.tokenId ||
-            activeTokenSecret ||
-            'demo-token',
+          token_id: activeToken,
         }),
       });
       const data = (await res.json()) as {
         result_image_uri?: string | null;
         quota?: { canTryTop: boolean; canTryBottom: boolean };
         warning_message?: string | null;
+        error_message?: string | null;
+        message?: string | null;
       };
-      setVtoState((prev) => {
-        const base =
-          prev.tokenKey === requestTokenKey
-            ? prev
-            : {
-                tokenKey: requestTokenKey,
-                quota: { canTryTop: true, canTryBottom: true },
-                outputUri: null,
-                warning: null,
-                stepMessage: null,
-              };
-        return {
-          tokenKey: requestTokenKey,
-          quota: data.quota
-            ? {
-                canTryTop: data.quota.canTryTop,
-                canTryBottom: data.quota.canTryBottom,
-              }
-            : base.quota,
-          outputUri: data.result_image_uri ?? base.outputUri,
-          warning: data.warning_message ?? base.warning,
-          stepMessage: null,
-        };
-      });
-      setSelectedTopId(null);
-      setSelectedBottomId(null);
+      if (data.result_image_uri) {
+        setVtoOutputUri(data.result_image_uri);
+        setSelectedTopId(null);
+        setSelectedBottomId(null);
+        setVtoQuota({ canTryTop: false, canTryBottom: false });
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`flicks_vto_${activeToken}`, data.result_image_uri);
+          }
+        } catch {
+          // Ignore storage errors
+        }
+      }
+      if (data.quota && !data.result_image_uri) {
+        setVtoQuota({
+          canTryTop: data.quota.canTryTop,
+          canTryBottom: data.quota.canTryBottom,
+        });
+      }
+      if (data.warning_message) {
+        setVtoWarning(data.warning_message);
+      } else if (!res.ok || data.error_message || data.message) {
+        setVtoWarning(
+          data.error_message ||
+            data.message ||
+            'Gagal memproses Virtual Try-On. Silakan coba kembali.',
+        );
+      }
     } finally {
       setVtoRunning(false);
-      setVtoState((prev) =>
-        prev.tokenKey === requestTokenKey
-          ? { ...prev, stepMessage: null }
-          : prev,
-      );
+      setVtoStepMessage(null);
     }
   }
 
@@ -646,9 +649,7 @@ export function PhotoIntakeForm({
           Privasi
         </label>
         <button
-          className={
-            requirePurchasedToken ? styles.submit : styles.secondaryAction
-          }
+          className={requirePurchasedToken ? styles.submit : styles.secondaryAction}
           disabled={isCheckoutLocked || !ready || !consent || !gender || analyzing}
           onClick={() => void runLiveGeminiAnalysis()}
           type="button"
@@ -771,11 +772,16 @@ export function PhotoIntakeForm({
                     )}
                     <button
                       type="button"
-                      disabled={!vtoQuota.canTryTop || vtoRunning}
+                      disabled={!vtoQuota.canTryTop || vtoRunning || Boolean(vtoOutputUri)}
                       aria-label={`Pilih Atasan: ${item.name}`}
-                      onClick={() =>
-                        setSelectedTopId(isSelected ? null : item.id)
-                      }
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedTopId(null);
+                        } else {
+                          setSelectedTopId(item.id);
+                          setSelectedBottomId(null);
+                        }
+                      }}
                       className={styles.selectProductBtn}
                     >
                       {isSelected ? 'Terpilih ✓' : 'Pilih Atasan'}
@@ -815,11 +821,16 @@ export function PhotoIntakeForm({
                     )}
                     <button
                       type="button"
-                      disabled={!vtoQuota.canTryBottom || vtoRunning}
+                      disabled={!vtoQuota.canTryBottom || vtoRunning || Boolean(vtoOutputUri)}
                       aria-label={`Pilih Bawahan: ${item.name}`}
-                      onClick={() =>
-                        setSelectedBottomId(isSelected ? null : item.id)
-                      }
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedBottomId(null);
+                        } else {
+                          setSelectedBottomId(item.id);
+                          setSelectedTopId(null);
+                        }
+                      }}
                       className={styles.selectProductBtn}
                     >
                       {isSelected ? 'Terpilih ✓' : 'Pilih Bawahan'}
@@ -836,9 +847,17 @@ export function PhotoIntakeForm({
           {vtoWarning && <p className={styles.vtoWarningBanner}>{vtoWarning}</p>}
 
           <div className={styles.vtoActionRow}>
-            {!vtoQuota.canTryTop && !vtoQuota.canTryBottom ? (
+            {vtoOutputUri || (!vtoQuota.canTryTop && !vtoQuota.canTryBottom) ? (
               <div className={styles.upsellBanner}>
                 <p>Kuota Virtual Try-On sesi ini telah habis (0/1 Atasan, 0/1 Bawahan).</p>
+                <button
+                  type="button"
+                  disabled={true}
+                  className={styles.tryOnCtaBtn}
+                  style={{ opacity: 0.6, cursor: 'not-allowed', marginBottom: '0.75rem' }}
+                >
+                  VIRTUAL TRY-ON SELESAI (1/1 DIGUNAKAN) ✓
+                </button>
                 <a
                   href={requirePurchasedToken ? '#checkout-section' : '/checkout'}
                   className={styles.upsellBtn}
@@ -854,7 +873,7 @@ export function PhotoIntakeForm({
                 className={styles.tryOnCtaBtn}
               >
                 {vtoRunning
-                  ? 'MEMPROSES TRY-ON...'
+                  ? '⏳ MEMPROSES SIMULASI TRY-ON... (MOHON TUNGGU)'
                   : 'COBA VIRTUAL TRY-ON SEKARANG'}
               </button>
             )}

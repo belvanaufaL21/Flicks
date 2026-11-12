@@ -19,6 +19,8 @@ import {
 
 export const maxDuration = 60;
 
+const activeVtoTokens = new Set<string>();
+
 function errorResponse(status: number, error: string, message: string) {
   return NextResponse.json({ error, message }, { status });
 }
@@ -97,6 +99,14 @@ export async function POST(request: Request) {
       );
     }
 
+    if (activeVtoTokens.has(resolvedTokenId)) {
+      return errorResponse(
+        409,
+        'JOB_IN_PROGRESS',
+        'Simulasi Virtual Try-On sedang diproses. Mohon tunggu proses selesai.',
+      );
+    }
+
     const currentQuota = checkVtoQuota(resolvedTokenId);
     if (topProductId && !currentQuota.canTryTop) {
       return errorResponse(
@@ -110,6 +120,37 @@ export async function POST(request: Request) {
         403,
         'BOTTOM_QUOTA_EXHAUSTED',
         'Kuota bawahan sudah terpakai untuk sesi ini',
+      );
+    }
+
+    const vtoService = createSupabaseVirtualTryOnService();
+    const guard = await vtoService.checkExecutionGuard(resolvedTokenId);
+
+    if (guard.status === 'completed' && guard.cachedResultUri) {
+      return NextResponse.json({
+        status: 'succeeded',
+        result_image_uri: guard.cachedResultUri,
+        quota: {
+          topUsed: true,
+          bottomUsed: true,
+          topsRemaining: 0,
+          bottomsRemaining: 0,
+          canTryTop: false,
+          canTryBottom: false,
+        },
+        warning_message:
+          guard.message ??
+          'Simulasi Virtual Try-On untuk sesi ini telah selesai dan hasilnya sudah tersedia.',
+        cached: true,
+      });
+    }
+
+    if (guard.status === 'processing') {
+      return errorResponse(
+        409,
+        'JOB_IN_PROGRESS',
+        guard.message ??
+          'Simulasi Virtual Try-On sedang diproses. Mohon tunggu proses selesai.',
       );
     }
 
@@ -151,7 +192,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const vtoService = createSupabaseVirtualTryOnService();
     const activeCatalog = await vtoService.listActiveProducts();
     const topProduct = topProductId
       ? activeCatalog.find((p) => p.id === topProductId) ?? null
@@ -167,18 +207,25 @@ export async function POST(request: Request) {
       return errorResponse(400, 'INVALID_PRODUCT', 'Produk bawahan tidak aktif atau tidak ditemukan');
     }
 
-    const pipelineResult = await executeVtoPipeline(
-      {
-        userPhotoUri: resolvedUserPhotoUri,
-        topProduct,
-        bottomProduct,
-      },
-      createFashnRestProvider(),
-    );
+    activeVtoTokens.add(resolvedTokenId);
+    let pipelineResult;
+    try {
+      pipelineResult = await executeVtoPipeline(
+        {
+          userPhotoUri: resolvedUserPhotoUri,
+          topProduct,
+          bottomProduct,
+        },
+        createFashnRestProvider(),
+      );
+    } finally {
+      activeVtoTokens.delete(resolvedTokenId);
+    }
 
+    const isSuccess = pipelineResult.status === 'succeeded';
     const quotaUpdate = consumeVtoQuota(resolvedTokenId, {
-      consumeTop: pipelineResult.quotaDeduction.top,
-      consumeBottom: pipelineResult.quotaDeduction.bottom,
+      consumeTop: isSuccess ? true : pipelineResult.quotaDeduction.top,
+      consumeBottom: isSuccess ? true : pipelineResult.quotaDeduction.bottom,
     });
 
     await vtoService

@@ -73,6 +73,13 @@ export interface VtoQuotaStatus {
   canTryBottom: boolean;
 }
 
+export interface VtoExecutionGuardResult {
+  canProceed: boolean;
+  status: 'idle' | 'processing' | 'completed';
+  cachedResultUri?: string | null;
+  message?: string;
+}
+
 // ponytail: in-memory quota tracking per tokenId; upgrade to Supabase tokens.vto_quota JSONB column when multi-instance scaling is added
 export function checkVtoQuota(tokenId: string): VtoQuotaStatus {
   const memoryState = getLocalDevMemoryState();
@@ -1190,6 +1197,36 @@ export function createVirtualTryOnService(
     return { jobId };
   }
 
+  async function checkExecutionGuard(
+    tokenId: string,
+  ): Promise<VtoExecutionGuardResult> {
+    const existingJob = await repository.findByTokenId(tokenId);
+    if (existingJob) {
+      if (existingJob.status === 'completed' && existingJob.resultPath) {
+        return {
+          canProceed: false,
+          status: 'completed',
+          cachedResultUri: existingJob.resultPath,
+          message:
+            'Simulasi Virtual Try-On untuk sesi ini telah selesai dan hasilnya sudah tersedia.',
+        };
+      }
+      if (existingJob.status === 'processing') {
+        return {
+          canProceed: false,
+          status: 'processing',
+          message:
+            'Simulasi Virtual Try-On sedang diproses. Mohon tunggu proses selesai.',
+        };
+      }
+    }
+
+    return {
+      canProceed: true,
+      status: 'idle',
+    };
+  }
+
   return {
     listActiveProducts,
     createJob: createOrRetryJob,
@@ -1197,6 +1234,8 @@ export function createVirtualTryOnService(
     processJob,
     syncJobStatus,
     getJob,
+    getJobByTokenId: (tokenId: string) => repository.findByTokenId(tokenId),
+    checkExecutionGuard,
     recordPipelineExecution,
   };
 }
