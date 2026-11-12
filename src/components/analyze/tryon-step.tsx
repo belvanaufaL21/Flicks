@@ -64,7 +64,22 @@ export function TryOnStep({
     }
   }
 
-  const stageSrc = completed && view === "after" ? (job?.resultPhotoUrl ?? bodyUrl) : bodyUrl;
+  // The result is a large image. Keep showing the body photo until it has fully loaded,
+  // then swap, so the stage never sits empty. The first loaded URL is kept: later polls
+  // hand out freshly signed URLs for the same image, which would reload it.
+  const resultSrc = completed ? (job?.resultPhotoUrl ?? null) : null;
+  const [readyResult, setReadyResult] = useState<string | null>(null);
+  useEffect(() => {
+    if (!resultSrc || readyResult) return;
+    const img = new window.Image(); // the browser's Image, not next/image
+    img.onload = img.onerror = () => setReadyResult(resultSrc);
+    img.src = resultSrc;
+    return () => {
+      img.onload = img.onerror = null;
+    };
+  }, [resultSrc, readyResult]);
+  const preparingResult = completed && !readyResult;
+  const stageSrc = completed && view === "after" && readyResult ? readyResult : bodyUrl;
 
   return (
     <div>
@@ -105,13 +120,18 @@ export function TryOnStep({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.6, ease: easeOut }}
               >
-                <ArchFrame src={stageSrc} alt={completed && view === "after" ? `Kamu memakai ${chosen?.name}` : "Foto seluruh badanmu"} className="aspect-[3/4]" scanning={working || busy} />
+                <ArchFrame
+                  src={stageSrc}
+                  alt={stageSrc === readyResult ? `Kamu memakai ${chosen?.name}` : "Foto seluruh badanmu"}
+                  className="aspect-[3/4]"
+                  scanning={working || busy || preparingResult}
+                />
               </motion.div>
             </AnimatePresence>
 
-            {(working || busy) && (
+            {(working || busy || preparingResult) && (
               <span className="absolute inset-x-0 bottom-5 mx-auto w-fit rounded-full bg-paper/95 px-4 py-2 text-xs font-medium text-ink shadow">
-                Memakaikan {chosen?.name ?? "pakaian"}…
+                {preparingResult ? "Menyiapkan hasil…" : `Memakaikan ${chosen?.name ?? "pakaian"}…`}
               </span>
             )}
 
