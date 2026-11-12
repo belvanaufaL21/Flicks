@@ -16,7 +16,9 @@ const FACE_MODEL =
 const POSE_MODEL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
-export type Check = { label: string; ok: boolean };
+/** One criterion. `id` lets the body-map bubbles light up the right check. */
+export type Check = { id: CheckId; label: string; ok: boolean };
+export type CheckId = "face_one" | "face_close" | "light" | "body_one" | "body_full" | "body_head" | "body_size" | "crop" | "unverified";
 /** Points in 0..1 coordinates of the cropped photo, used for the scan animation. */
 export type Point = { x: number; y: number };
 
@@ -114,7 +116,8 @@ function detectionCanvas(bitmap: ImageBitmap, max = 1280) {
   const c = document.createElement("canvas");
   c.width = Math.round(bitmap.width * scale);
   c.height = Math.round(bitmap.height * scale);
-  c.getContext("2d")!.drawImage(bitmap, 0, 0, c.width, c.height);
+  // Read back several times (brightness, backdrop colour): tell the browser up front.
+  c.getContext("2d", { willReadFrequently: true })!.drawImage(bitmap, 0, 0, c.width, c.height);
   return c;
 }
 
@@ -135,6 +138,33 @@ function brightness(canvas: HTMLCanvasElement, r: Rect) {
   return sum / n;
 }
 
+/** Average colour of the photo's top strip: the backdrop, used to extend the canvas. */
+function backdropColor(canvas: HTMLCanvasElement) {
+  const h = Math.max(1, Math.floor(canvas.height * 0.03));
+  const data = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, h).data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+    n++;
+  }
+  return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+}
+
+/**
+ * A rect of the given aspect around `focus`, centred on it, allowed to reach past the
+ * photo's edges (filled by cropToJpeg). Used for the full-body photo, where the head
+ * often sits close to the top border.
+ */
+function growRect(focus: Rect, aspect: number): Rect {
+  let w = focus.w;
+  let h = focus.h;
+  if (w / h < aspect) w = h * aspect;
+  else h = w / aspect;
+  return { x: focus.x + focus.w / 2 - w / 2, y: focus.y + focus.h / 2 - h / 2, w, h };
+}
+
 /** Fits a rect of the given aspect around `focus`, inside the image, as large as allowed. */
 function fitRect(focus: Rect, aspect: number, imgW: number, imgH: number): Rect {
   let w = focus.w;
@@ -152,13 +182,21 @@ function fitRect(focus: Rect, aspect: number, imgW: number, imgH: number): Rect 
   return { x, y, w, h };
 }
 
-async function cropToJpeg(bitmap: ImageBitmap, r: Rect, outW: number, outH: number) {
+/**
+ * Draws the rect `r` of the photo into an outW×outH JPEG. `r` may reach past the
+ * photo's edges (a head close to the top border); that area is filled with `fill`,
+ * the photo's own background colour, so the person is never cut off.
+ */
+async function cropToJpeg(bitmap: ImageBitmap, r: Rect, outW: number, outH: number, fill = "#f2eee6") {
   const c = document.createElement("canvas");
   c.width = outW;
   c.height = outH;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(bitmap, r.x, r.y, r.w, r.h, 0, 0, outW, outH);
+  ctx.fillStyle = fill;
+  ctx.fillRect(0, 0, outW, outH);
+  const scale = outW / r.w;
+  ctx.drawImage(bitmap, -r.x * scale, -r.y * scale, bitmap.width * scale, bitmap.height * scale);
   const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.88));
   if (!blob) throw new Error("Foto gagal diproses. Coba lagi.");
   return blob;
@@ -166,10 +204,10 @@ async function cropToJpeg(bitmap: ImageBitmap, r: Rect, outW: number, outH: numb
 
 const lightCheck = (b: number): Check & { reason?: string } =>
   b < 60
-    ? { label: "Pencahayaan cukup", ok: false, reason: "Foto terlalu gelap. Cari cahaya siang dari jendela." }
+    ? { id: "light", label: "Pencahayaan cukup", ok: false, reason: "Foto terlalu gelap. Cari cahaya siang dari jendela." }
     : b > 235
-      ? { label: "Pencahayaan cukup", ok: false, reason: "Foto terlalu terang. Hindari cahaya langsung dan flash." }
-      : { label: "Pencahayaan cukup", ok: true };
+      ? { id: "light", label: "Pencahayaan cukup", ok: false, reason: "Foto terlalu terang. Hindari cahaya langsung dan flash." }
+      : { id: "light", label: "Pencahayaan cukup", ok: true };
 
 // ---------------------------------------------------------------------------------
 
@@ -193,7 +231,7 @@ export async function prepareFace(file: File): Promise<Prepared> {
   const checks: Check[] = [];
 
   if (faces.length !== 1) {
-    checks.push({ label: "Satu wajah terlihat jelas", ok: false });
+    checks.push({ id: "face_one", label: "Satu wajah terlihat jelas", ok: false });
     return {
       ok: false,
       checks,
@@ -203,16 +241,16 @@ export async function prepareFace(file: File): Promise<Prepared> {
           : "Terdeteksi lebih dari satu wajah. Gunakan foto dirimu sendiri saja.",
     };
   }
-  checks.push({ label: "Satu wajah terlihat jelas", ok: true });
+  checks.push({ id: "face_one", label: "Satu wajah terlihat jelas", ok: true });
 
   const box = faces[0].boundingBox!;
   const face: Rect = { x: box.originX, y: box.originY, w: box.width, h: box.height };
   const sizeOk = face.w / canvas.width >= 0.12 && face.h * toSrc >= 140;
-  checks.push({ label: "Wajah cukup dekat", ok: sizeOk });
+  checks.push({ id: "face_close", label: "Wajah cukup dekat", ok: sizeOk });
   if (!sizeOk) return { ok: false, checks, reason: "Wajah terlalu kecil di foto. Dekatkan kamera ke wajah." };
 
   const light = lightCheck(brightness(canvas, face));
-  checks.push({ label: light.label, ok: light.ok });
+  checks.push({ id: "light", label: light.label, ok: light.ok });
   if (!light.ok) return { ok: false, checks, reason: light.reason! };
 
   // Square around face, hair and neck: colour analysis needs hair and skin together.
@@ -226,7 +264,7 @@ export async function prepareFace(file: File): Promise<Prepared> {
     x: (k.x * canvas.width - crop.x) / crop.w,
     y: (k.y * canvas.height - crop.y) / crop.h,
   }));
-  checks.push({ label: "Dipotong otomatis ke area wajah", ok: true });
+  checks.push({ id: "crop", label: "Dipotong otomatis ke area wajah", ok: true });
   return { ok: true, blob, url: URL.createObjectURL(blob), checks, points, verified: true };
 }
 
@@ -255,7 +293,7 @@ export async function prepareBody(file: File): Promise<Prepared> {
   const checks: Check[] = [];
 
   if (people.length !== 1) {
-    checks.push({ label: "Satu orang terlihat", ok: false });
+    checks.push({ id: "body_one", label: "Satu orang terlihat", ok: false });
     return {
       ok: false,
       checks,
@@ -265,15 +303,25 @@ export async function prepareBody(file: File): Promise<Prepared> {
           : "Terdeteksi lebih dari satu orang. Gunakan foto dirimu sendiri saja.",
     };
   }
-  checks.push({ label: "Satu orang terlihat", ok: true });
+  checks.push({ id: "body_one", label: "Satu orang terlihat", ok: true });
 
   const lm = people[0];
   const inFrame = (i: number) =>
     (lm[i].visibility ?? 1) > 0.5 && lm[i].x > 0.01 && lm[i].x < 0.99 && lm[i].y > 0.01 && lm[i].y < 0.995;
   const fullBody = inFrame(NOSE) && REQUIRED.every(inFrame);
-  checks.push({ label: "Terlihat dari kepala sampai kaki", ok: fullBody });
+  checks.push({ id: "body_full", label: "Terlihat dari kepala sampai kaki", ok: fullBody });
   if (!fullBody) {
     return { ok: false, checks, reason: "Seluruh badan belum terlihat. Pastikan kepala sampai kaki masuk ke foto." };
+  }
+
+  // The nose can be in frame while the top of the head is not. The crown sits roughly
+  // half the eye-to-shoulder distance above the eyes; it must be inside the photo.
+  const eyeY = Math.min(lm[2].y, lm[5].y);
+  const shoulderY = (lm[11].y + lm[12].y) / 2;
+  const headOk = eyeY - (shoulderY - eyeY) * 0.5 >= -0.005;
+  checks.push({ id: "body_head", label: "Kepala tidak terpotong", ok: headOk });
+  if (!headOk) {
+    return { ok: false, checks, reason: "Kepala terpotong di bagian atas. Beri sedikit ruang di atas kepala." };
   }
 
   const ys = [NOSE, ...REQUIRED, ...FEET].filter((i) => lm[i]).map((i) => lm[i].y * canvas.height);
@@ -282,28 +330,32 @@ export async function prepareBody(file: File): Promise<Prepared> {
   const bottom = Math.max(...ys);
   const bodyH = bottom - top;
   const bigEnough = bodyH / canvas.height >= 0.45 && bodyH * toSrc >= 500;
-  checks.push({ label: "Badan cukup besar di foto", ok: bigEnough });
+  checks.push({ id: "body_size", label: "Badan cukup besar di foto", ok: bigEnough });
   if (!bigEnough) return { ok: false, checks, reason: "Kamu terlihat terlalu jauh. Mundurkan kamera sedikit saja." };
 
-  // Head top sits about a fifth of the body height above the nose.
+  // Room above the highest face point (eyes, ears) for the whole head plus some air,
+  // and a little below the feet. The crop may extend past the photo's edges; that
+  // part is filled with the photo's own backdrop colour, so nobody gets cut off.
+  const faceTop = Math.min(...lm.slice(0, 11).map((p) => p.y * canvas.height));
+  const focusTop = faceTop - bodyH * 0.2;
   const focus: Rect = {
-    x: Math.min(...xs) - bodyH * 0.12,
-    y: top - bodyH * 0.2,
-    w: Math.max(...xs) - Math.min(...xs) + bodyH * 0.24,
-    h: bodyH * 1.26,
+    x: Math.min(...xs) - bodyH * 0.1,
+    y: focusTop,
+    w: Math.max(...xs) - Math.min(...xs) + bodyH * 0.2,
+    h: bottom + bodyH * 0.05 - focusTop,
   };
   const light = lightCheck(brightness(canvas, focus));
-  checks.push({ label: light.label, ok: light.ok });
+  checks.push({ id: "light", label: light.label, ok: light.ok });
   if (!light.ok) return { ok: false, checks, reason: light.reason! };
 
-  const crop = fitRect(focus, 3 / 4, canvas.width, canvas.height);
+  const crop = growRect(focus, 3 / 4);
   const srcCrop = { x: crop.x * toSrc, y: crop.y * toSrc, w: crop.w * toSrc, h: crop.h * toSrc };
-  const blob = await cropToJpeg(bitmap, srcCrop, 960, 1280);
+  const blob = await cropToJpeg(bitmap, srcCrop, 960, 1280, backdropColor(canvas));
   const points = lm.map((p) => ({
     x: (p.x * canvas.width - crop.x) / crop.w,
     y: (p.y * canvas.height - crop.y) / crop.h,
   }));
-  checks.push({ label: "Dipotong otomatis ke seluruh badan", ok: true });
+  checks.push({ id: "crop", label: "Dipotong otomatis ke seluruh badan", ok: true });
   return { ok: true, blob, url: URL.createObjectURL(blob), checks, points, verified: true };
 }
 
@@ -324,7 +376,7 @@ async function fallback(bitmap: ImageBitmap, kind: "face" | "body"): Promise<Pre
     ok: true,
     blob,
     url: URL.createObjectURL(blob),
-    checks: [{ label: "Pemeriksaan otomatis tidak tersedia, foto dikirim apa adanya", ok: true }],
+    checks: [{ id: "unverified", label: "Pemeriksaan otomatis tidak tersedia, foto dikirim apa adanya", ok: true }],
     points: [],
     verified: false,
   };
