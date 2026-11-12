@@ -31,6 +31,8 @@ export async function startCheckout(sessionHash: string): Promise<Payment> {
     if (pendingFresh || (token && token.status !== "consumed")) return existing;
   }
 
+  if (config.freeCheckout) return startFreeCheckout(store, sessionHash);
+
   const orderId = newOrderId();
   const charge = await createQrisPayment(orderId, config.priceIdr, PENDING_TTL_MINUTES);
   return store.insertPayment({
@@ -47,6 +49,30 @@ export async function startCheckout(sessionHash: string): Promise<Payment> {
     createdAt: new Date().toISOString(),
     paidAt: null,
   });
+}
+
+/**
+ * Trial mode: records a zero-cost "payment" (reference FREE-…, so it never mixes with
+ * real Midtrans orders in reports) and issues its token straight away. The list price
+ * is kept as the amount only because the table requires a positive amount.
+ */
+async function startFreeCheckout(store: ReturnType<typeof getStore>, sessionHash: string) {
+  const payment = await store.insertPayment({
+    id: newId("pay"),
+    provider: "mock",
+    providerReference: newOrderId().replace("FLK-", "FREE-"),
+    sessionHash,
+    amount: config.priceIdr,
+    currency: "IDR",
+    status: "pending",
+    paymentUrl: null,
+    qrString: null,
+    expiresAt: null,
+    createdAt: new Date().toISOString(),
+    paidAt: null,
+  });
+  await store.settlePayment(payment.id, newId("tok"));
+  return (await store.paymentByReference(payment.providerReference))!;
 }
 
 /**

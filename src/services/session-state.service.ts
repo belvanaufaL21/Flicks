@@ -1,4 +1,4 @@
-import { config, isDemoMode, missingSettings } from "@/lib/config";
+import { config, demoNotes, missingSettings } from "@/lib/config";
 import { getStore, storeAvailable } from "@/lib/store";
 import { refreshPayment } from "./payment.service";
 import { refreshTryon } from "./tryon.service";
@@ -10,10 +10,12 @@ export type FlowState = Awaited<ReturnType<typeof getFlowState>>;
 
 export async function getFlowState(sessionHash: string | null, reportSecret: string | null) {
   const base = {
-    demo: isDemoMode(),
+    // Only the parts that are really simulated right now, in words the visitor understands.
+    demoNotes: demoNotes(),
     // Sales are open only when the kill-switch is off and production has every setting.
     paidFeaturesEnabled: config.paidFeaturesEnabled && missingSettings().length === 0,
     priceIdr: config.priceIdr,
+    freeCheckout: config.freeCheckout,
   };
   const empty = { ...base, payment: null, token: null, analysis: null, tryon: null, reportPath: null };
   // Without a database there is nothing to resume; show the page as "not available".
@@ -41,7 +43,7 @@ export async function getFlowState(sessionHash: string | null, reportSecret: str
       amount: payment.amount,
       paymentUrl: payment.paymentUrl,
       expiresAt: payment.expiresAt,
-      simulated: payment.provider === "mock",
+      simulated: payment.provider === "mock" && !payment.providerReference.startsWith("FREE-"),
     },
     token: token && { status: token.status, attemptsUsed: token.analysisAttempts },
     analysis: analysis && {

@@ -1,4 +1,3 @@
-import { isDemoMode } from "@/lib/config";
 import { sha256, signedMediaUrl } from "@/lib/security";
 import { getStore } from "@/lib/store";
 import type { Analysis } from "@/types/domain";
@@ -10,7 +9,8 @@ export type ReportView =
   | { state: "pending"; status: Analysis["status"] }
   | {
       state: "ready";
-      demo: boolean;
+      /** What in THIS report was simulated, judged from how it was produced. */
+      demoNotes: string[];
       createdAt: string;
       expiresAt: string;
       personalColor: NonNullable<Analysis["personalColor"]>;
@@ -61,7 +61,10 @@ export async function getReport(secret: string): Promise<ReportView> {
 
   return {
     state: "ready",
-    demo: isDemoMode() || analysis.modelMetadata?.provider === "mock",
+    demoNotes: [
+      ...(analysis.modelMetadata?.provider === "mock" ? ["hasil analisis di bawah adalah contoh tetap, bukan dari fotomu"] : []),
+      ...(job?.provider === "mock" ? ["gambar try-on adalah foto aslimu tanpa pakaian baru"] : []),
+    ],
     createdAt: analysis.completedAt ?? analysis.createdAt,
     expiresAt: analysis.reportExpiresAt,
     personalColor: analysis.personalColor,

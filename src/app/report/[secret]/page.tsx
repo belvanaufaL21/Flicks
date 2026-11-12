@@ -107,12 +107,11 @@ function ReadyReport({ r }: { r: Ready }) {
         </div>
       </div>
 
-      {r.demo && (
+      {r.demoNotes.length > 0 && (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent-soft/60 px-4 py-3 text-sm text-accent-deep">
           <FlaskConical size={18} className="mt-0.5 shrink-0" />
           <p>
-            <span className="font-semibold">Mode demo.</span> Hasil di bawah adalah contoh tetap, bukan analisis dari fotomu,
-            dan gambar try-on adalah foto aslimu tanpa pakaian baru.
+            <span className="font-semibold">Mode demo:</span> {r.demoNotes.join("; ")}.
           </p>
         </div>
       )}

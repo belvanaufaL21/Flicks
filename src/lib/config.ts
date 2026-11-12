@@ -35,6 +35,11 @@ export const config = {
   // Kill-switch (PRD release gate 8): set to "false" to stop all paid features at once.
   paidFeaturesEnabled: env.PAID_FEATURES_ENABLED !== "false",
 
+  // Trial mode: step 1 issues a token without payment, so the flow can be tried
+  // before Midtrans is ready. Off unless set to "true". Every free token still runs
+  // the real analysis model (about Rp200 each), so switch it off before launch.
+  freeCheckout: env.FREE_CHECKOUT === "true",
+
   supabase: {
     url: env.NEXT_PUBLIC_SUPABASE_URL,
     secretKey: env.SUPABASE_SECRET_KEY,
@@ -61,8 +66,11 @@ export const config = {
   },
 
   fashn: {
-    get mode() {
-      return providerMode(env.FASHN_API_KEY);
+    get mode(): ProviderMode {
+      const mode = providerMode(env.FASHN_API_KEY);
+      // During the free trial nobody pays, so a demo try-on is acceptable even in
+      // production; the page says so. With paid checkout a missing key stays "missing".
+      return mode === "missing" && env.FREE_CHECKOUT === "true" ? "mock" : mode;
     },
     apiKey: env.FASHN_API_KEY,
     model: env.FASHN_MODEL || "tryon-v1.6",
@@ -114,12 +122,22 @@ export function missingSettings(): string[] {
     MEDIA_SIGNING_SECRET: config.mediaSigningSecret,
     OPENROUTER_API_KEY: config.openrouter.mode !== "missing",
     FASHN_API_KEY: config.fashn.mode !== "missing",
-    MIDTRANS_SERVER_KEY: config.midtrans.mode !== "missing",
+    // Not needed while trial mode hands out tokens without payment.
+    MIDTRANS_SERVER_KEY: config.freeCheckout || config.midtrans.mode !== "missing",
   };
   return Object.entries(required)
     .filter(([, v]) => !v)
     .map(([name]) => name);
 }
+/** Plain-language notes for the parts of the flow that are currently simulated. */
+export function demoNotes(): string[] {
+  const notes: string[] = [];
+  if (config.midtrans.mode === "mock" && !config.freeCheckout) notes.push("pembayaran disimulasikan, tidak ada uang yang ditarik");
+  if (config.openrouter.mode === "mock") notes.push("hasil analisis berupa contoh tetap, bukan dari fotomu");
+  if (config.fashn.mode === "mock") notes.push("virtual try-on menampilkan foto aslimu tanpa pakaian baru");
+  return notes;
+}
+
 export function isDemoMode() {
   return (
     config.openrouter.mode === "mock" || config.fashn.mode === "mock" || config.midtrans.mode === "mock"

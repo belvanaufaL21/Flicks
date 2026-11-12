@@ -90,12 +90,11 @@ export function AnalyzeFlow() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-24 pt-8 sm:px-6">
-      {state?.demo && (
+      {state && state.demoNotes.length > 0 && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent-soft/60 px-4 py-3 text-sm text-accent-deep">
           <FlaskConical size={18} className="mt-0.5 shrink-0" />
           <p>
-            <span className="font-semibold">Mode demo.</span> Satu atau lebih kunci API belum diatur, jadi pembayaran
-            disimulasikan dan hasil AI berupa contoh tetap. Tidak ada uang yang ditarik.
+            <span className="font-semibold">Mode demo:</span> {state.demoNotes.join("; ")}.
           </p>
         </div>
       )}
@@ -233,6 +232,8 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
   const payment = state.payment;
   const pending = payment?.status === "pending";
   const lapsed = payment && (payment.status === "expired" || payment.status === "failed");
+  // Trial mode: the token is issued without payment.
+  const free = state.freeCheckout;
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -257,10 +258,16 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
   return (
     <div className="grid gap-10 md:grid-cols-[1.1fr_1fr] md:items-start">
       <div>
-        <Heading eyebrow="Langkah 1 · Pembayaran" title={<>Satu token, <em className="text-accent">satu paket lengkap</em>.</>}>
-          Bayar sekali dengan QRIS. Token diterbitkan setelah pembayaran terverifikasi oleh server, bukan oleh
-          browser.
-        </Heading>
+        {free ? (
+          <Heading eyebrow="Langkah 1 · Uji coba gratis" title={<>Coba dulu, <em className="text-accent">gratis</em>.</>}>
+            Selama masa uji coba, kamu tidak perlu membayar. Paketnya sama lengkapnya dengan versi berbayar.
+          </Heading>
+        ) : (
+          <Heading eyebrow="Langkah 1 · Pembayaran" title={<>Satu token, <em className="text-accent">satu paket lengkap</em>.</>}>
+            Bayar sekali dengan QRIS. Token diterbitkan setelah pembayaran terverifikasi oleh server, bukan oleh
+            browser.
+          </Heading>
+        )}
         <ul className="mt-8 space-y-3">
           {items.map((t) => (
             <li key={t} className="flex items-center gap-3 text-ink">
@@ -280,24 +287,37 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
         <div className="flex items-center justify-between text-sm text-muted">
           <span className="font-display text-xl text-ink">FLICKS Lite</span>
           <span className="flex items-center gap-1.5">
-            <QrCode size={15} /> QRIS
+            {free ? (
+              <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-deep">Uji coba</span>
+            ) : (
+              <>
+                <QrCode size={15} /> QRIS
+              </>
+            )}
           </span>
         </div>
         <div className="my-5 border-t border-dashed border-line" />
         <div className="space-y-2 font-mono text-xs text-muted">
           <div className="flex justify-between">
             <span>1× Token FLICKS</span>
-            <span className="text-ink">{rupiah(state.priceIdr)}</span>
+            <span className={free ? "text-muted line-through" : "text-ink"}>{rupiah(state.priceIdr)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Biaya tersembunyi</span>
-            <span className="text-ink">Rp0</span>
-          </div>
+          {free ? (
+            <div className="flex justify-between">
+              <span>Gratis selama uji coba</span>
+              <span className="text-ink">−{rupiah(state.priceIdr)}</span>
+            </div>
+          ) : (
+            <div className="flex justify-between">
+              <span>Biaya tersembunyi</span>
+              <span className="text-ink">Rp0</span>
+            </div>
+          )}
         </div>
         <div className="my-5 border-t border-dashed border-line" />
         <div className="flex items-baseline justify-between">
           <span className="text-xs font-semibold uppercase tracking-widest text-muted">Total</span>
-          <span className="font-display text-4xl text-ink">{rupiah(state.priceIdr)}</span>
+          <span className="font-display text-4xl text-ink">{free ? "Rp0" : rupiah(state.priceIdr)}</span>
         </div>
 
         {pending ? (
@@ -353,7 +373,7 @@ function CheckoutStep({ state, onChange }: { state: FlowState; onChange: () => v
                 })
               }
             >
-              Bayar {rupiah(state.priceIdr)} dengan QRIS <ArrowRight size={16} />
+              {free ? "Mulai gratis" : `Bayar ${rupiah(state.priceIdr)} dengan QRIS`} <ArrowRight size={16} />
             </PrimaryButton>
             {!state.paidFeaturesEnabled && (
               <p className="mt-3 text-sm text-red-900">Pembelian sedang tidak tersedia. Coba lagi nanti.</p>
