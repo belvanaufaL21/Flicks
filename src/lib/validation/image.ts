@@ -3,7 +3,9 @@
 // never trusted: the type is read from the file's bytes, not from its name or header.
 
 export const PHOTO_LIMITS = {
-  maxBytes: 8 * 1024 * 1024,
+  // Per photo, after the browser has cropped and compressed it. Two of these must fit
+  // in Vercel's 4.5 MB request limit.
+  maxBytes: 2 * 1024 * 1024,
   minShortSide: 512,
   maxLongSide: 8000,
   mimes: ["image/jpeg", "image/png", "image/webp"] as const,
@@ -60,7 +62,7 @@ export function inspectImage(bytes: Uint8Array): ImageInfo | null {
 
 export function validatePhoto(bytes: Uint8Array, label: string): ImageInfo {
   if (bytes.length === 0) throw new PhotoError(`${label}: file kosong.`);
-  if (bytes.length > PHOTO_LIMITS.maxBytes) throw new PhotoError(`${label}: ukuran file lebih dari 8 MB.`);
+  if (bytes.length > PHOTO_LIMITS.maxBytes) throw new PhotoError(`${label}: ukuran file terlalu besar.`);
 
   const info = inspectImage(bytes);
   if (!info) throw new PhotoError(`${label}: format tidak didukung. Gunakan JPG, PNG, atau WebP.`);

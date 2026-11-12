@@ -1,4 +1,5 @@
 import { config, demoNotes, missingSettings } from "@/lib/config";
+import { signedMediaUrl } from "@/lib/security";
 import { getStore, storeAvailable } from "@/lib/store";
 import { refreshPayment } from "./payment.service";
 import { refreshTryon } from "./tryon.service";
@@ -54,8 +55,20 @@ export async function getFlowState(sessionHash: string | null, reportSecret: str
         analysis.status === "needs_retake"
           ? [...(analysis.personalColor?.photo_quality.issues ?? []), ...(analysis.bodyShape?.photo_quality.issues ?? [])]
           : [],
+      // Short-lived signed links so the scan screen and the try-on stage can show the
+      // visitor's own photos, also after a refresh. Retake/failed runs deleted them.
+      facePhotoUrl: photosKept(analysis.status) ? signedMediaUrl(analysis.facePhotoId) : null,
+      bodyPhotoUrl: photosKept(analysis.status) ? signedMediaUrl(analysis.bodyPhotoId) : null,
     },
-    tryon: job && { id: job.id, status: job.status, productId: job.productId, attempts: job.attempts },
+    tryon: job && {
+      id: job.id,
+      status: job.status,
+      productId: job.productId,
+      attempts: job.attempts,
+      resultPhotoUrl: job.status === "completed" && job.resultPhotoId ? signedMediaUrl(job.resultPhotoId) : null,
+    },
     reportPath: analysis?.status === "completed" && reportSecret ? `/report/${reportSecret}` : null,
   };
 }
+
+const photosKept = (status: string) => status !== "needs_retake" && status !== "failed";

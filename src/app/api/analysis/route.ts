@@ -1,7 +1,8 @@
 import { after } from "next/server";
 import { errorResponse, json, tooManyRequests } from "@/lib/http/respond";
 import { clientKey, rateLimit } from "@/lib/security";
-import { readSessionHash, rememberReportSecret } from "@/lib/session";
+import { readReportSecret, readSessionHash, rememberReportSecret } from "@/lib/session";
+import { getFlowState } from "@/services/session-state.service";
 import { PHOTO_LIMITS, PhotoError, validatePhoto } from "@/lib/validation/image";
 import { FlowError, runAnalysis, startAnalysis } from "@/services/analysis.service";
 
@@ -10,7 +11,7 @@ export const maxDuration = 120;
 async function readPhoto(form: FormData, field: string, label: string) {
   const file = form.get(field);
   if (!(file instanceof File)) throw new PhotoError(`${label} wajib diunggah.`);
-  if (file.size > PHOTO_LIMITS.maxBytes) throw new PhotoError(`${label}: ukuran file lebih dari 8 MB.`);
+  if (file.size > PHOTO_LIMITS.maxBytes) throw new PhotoError(`${label}: ukuran file terlalu besar.`);
   const bytes = new Uint8Array(await file.arrayBuffer());
   return { bytes, info: validatePhoto(bytes, label) };
 }
@@ -40,7 +41,9 @@ export async function POST(request: Request) {
       await rememberReportSecret(reportSecret);
       after(() => runAnalysis(analysis.id));
     }
-    return json({ id: analysis.id, status: analysis.status }, reportSecret ? 201 : 200);
+    // The flow state rides along so the page switches to the analysis screen at once.
+    const state = await getFlowState(sessionHash, reportSecret ?? (await readReportSecret()));
+    return json({ id: analysis.id, status: analysis.status, state }, reportSecret ? 201 : 200);
   } catch (err) {
     return errorResponse(err);
   }
