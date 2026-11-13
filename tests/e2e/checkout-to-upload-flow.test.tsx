@@ -429,7 +429,7 @@ describe('Checkout-to-Upload E2E Flow (Section 4)', () => {
     });
     await user.click(selectTopBtn);
     await user.click(
-      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON SEKARANG/i }),
+      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON/i }),
     );
 
     await waitFor(() => {
@@ -588,7 +588,7 @@ describe('Checkout-to-Upload E2E Flow (Section 4)', () => {
       await screen.findByRole('button', { name: /Pilih Atasan: Olive Linen Shirt/i }),
     );
     await user.click(
-      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON SEKARANG/i }),
+      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON/i }),
     );
 
     const upsellLink = await screen.findByRole('link', {
@@ -610,7 +610,7 @@ describe('Checkout-to-Upload E2E Flow (Section 4)', () => {
       await screen.findByRole('button', { name: /Pilih Atasan: Olive Linen Shirt/i }),
     );
     await user.click(
-      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON SEKARANG/i }),
+      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON/i }),
     );
 
     await waitFor(() => {

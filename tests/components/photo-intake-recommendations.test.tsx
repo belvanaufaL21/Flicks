@@ -147,7 +147,9 @@ describe('PhotoIntakeForm - Catalog Recommendations & Dual-Quota VTO', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('button', { name: /COBA VIRTUAL TRY-ON SEKARANG/i }),
+      screen.getByRole('button', {
+        name: /COBA VIRTUAL TRY-ON 1 SETELAN \(ATASAN & BAWAHAN\)/i,
+      }),
     );
 
     await waitFor(() => {
@@ -200,7 +202,7 @@ describe('PhotoIntakeForm - Catalog Recommendations & Dual-Quota VTO', () => {
     });
   });
 
-  it('enforces single-credit locking: mutual exclusivity, disables selection & CTA when completed', async () => {
+  it('allows concurrent selection of 1 setelan (atasan + bawahan) and locks both when exhausted', async () => {
     sessionStorage.clear();
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('/api/recommendations')) {
@@ -276,13 +278,13 @@ describe('PhotoIntakeForm - Catalog Recommendations & Dual-Quota VTO', () => {
     fireEvent.click(topBtn);
     expect(topBtn.textContent).toContain('Terpilih ✓');
 
-    // Select Bottom -> mutually exclusive (clears top)
+    // Select Bottom -> BOTH can be selected for 1 setelan!
     fireEvent.click(botBtn);
     expect(botBtn.textContent).toContain('Terpilih ✓');
-    expect(topBtn.textContent).not.toContain('Terpilih ✓');
+    expect(topBtn.textContent).toContain('Terpilih ✓');
 
     const ctaBtn = screen.getByRole('button', {
-      name: /COBA VIRTUAL TRY-ON SEKARANG/i,
+      name: /COBA VIRTUAL TRY-ON 1 SETELAN \(ATASAN & BAWAHAN\)/i,
     });
     fireEvent.click(ctaBtn);
 
@@ -290,23 +292,119 @@ describe('PhotoIntakeForm - Catalog Recommendations & Dual-Quota VTO', () => {
     await waitFor(() => {
       expect(
         screen.getByRole('button', {
-          name: /VIRTUAL TRY-ON SELESAI \(1\/1 DIGUNAKAN\) ✓/i,
+          name: /VIRTUAL TRY-ON SELESAI \(KUOTA HABIS\) ✓/i,
         }),
       ).toBeDefined();
     });
 
     const completedCta = screen.getByRole('button', {
-      name: /VIRTUAL TRY-ON SELESAI \(1\/1 DIGUNAKAN\) ✓/i,
+      name: /VIRTUAL TRY-ON SELESAI \(KUOTA HABIS\) ✓/i,
     }) as HTMLButtonElement;
     expect(completedCta.disabled).toBe(true);
 
-    // Catalog selection buttons are disabled
+    // Catalog selection buttons are disabled and show Kuota Habis
     expect((topBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(topBtn.textContent).toContain('Kuota Habis (0/1)');
     expect((botBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(botBtn.textContent).toContain('Kuota Habis (0/1)');
 
     // Verify persisted in sessionStorage
     expect(
       sessionStorage.getItem('flicks_vto_tok-single-lock'),
     ).toBe('https://fashn.cdn/output_single_locked.jpg');
+  });
+
+  it('allows trying only atasan first, locks only atasan, and keeps bawahan available', async () => {
+    sessionStorage.clear();
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/recommendations')) {
+        return new Response(
+          JSON.stringify({
+            recommendations: {
+              tops: [
+                {
+                  id: 'top-part-1',
+                  name: 'Linen Button Shirt',
+                  brand: 'FLICKS',
+                  category: 'tops',
+                  imagePath: 'https://storage/linen.jpg',
+                },
+              ],
+              bottoms: [
+                {
+                  id: 'bot-part-1',
+                  name: 'Relaxed Trousers',
+                  brand: 'FLICKS',
+                  category: 'bottoms',
+                  imagePath: 'https://storage/relaxed.jpg',
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes('/api/virtual-try-on')) {
+        return new Response(
+          JSON.stringify({
+            status: 'succeeded',
+            result_image_uri: 'https://fashn.cdn/step1_linen_top.jpg',
+            quota: {
+              canTryTop: false,
+              canTryBottom: true,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <PhotoIntakeForm
+        initialAnalysisComplete={{
+          gender: 'male',
+          bodyShape: 'trapezoid',
+          colorSeason: 'autumn',
+          userPhotoUri: 'https://storage/user-man.jpg',
+          tokenId: 'tok-partial-vto',
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Linen Button Shirt')).toBeDefined();
+      expect(screen.getByText('Relaxed Trousers')).toBeDefined();
+    });
+
+    const topBtn = screen.getByRole('button', {
+      name: /Pilih Atasan: Linen Button Shirt/i,
+    });
+    const botBtn = screen.getByRole('button', {
+      name: /Pilih Bawahan: Relaxed Trousers/i,
+    });
+
+    // Select ONLY Top
+    fireEvent.click(topBtn);
+    expect(topBtn.textContent).toContain('Terpilih ✓');
+
+    const ctaBtn = screen.getByRole('button', {
+      name: /COBA VIRTUAL TRY-ON \(ATASAN\)/i,
+    });
+    fireEvent.click(ctaBtn);
+
+    // After top completes:
+    await waitFor(() => {
+      // Top button is locked and shows Kuota Habis (0/1)
+      expect((topBtn as HTMLButtonElement).disabled).toBe(true);
+      expect(topBtn.textContent).toContain('Kuota Habis (0/1)');
+      // Bottom button remains ENABLED and ready to be picked!
+      expect((botBtn as HTMLButtonElement).disabled).toBe(false);
+      expect(botBtn.textContent).toContain('Pilih Bawahan');
+      expect(screen.getByText(/Kuota Atasan: 0\/1 Terpakai/i)).toBeDefined();
+      expect(screen.getByText(/Kuota Bawahan: 1\/1 Tersedia/i)).toBeDefined();
+    });
   });
 });

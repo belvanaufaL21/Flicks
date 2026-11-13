@@ -7,6 +7,10 @@ import {
 } from '@/server/dev/local-memory-store';
 import { getRequiredEnv } from '@/server/env';
 import {
+  recordOperationalEvent,
+  trackPaidExecutionAndDetectSpike,
+} from '@/server/monitoring/monitor';
+import {
   FASHN_CREDIT_COST_IDR,
   FASHN_ESTIMATED_COST_IDR,
   FashnProviderError,
@@ -75,9 +79,10 @@ export interface VtoQuotaStatus {
 
 export interface VtoExecutionGuardResult {
   canProceed: boolean;
-  status: 'idle' | 'processing' | 'completed';
+  status: 'idle' | 'processing' | 'completed' | 'quota_exhausted';
   cachedResultUri?: string | null;
   message?: string;
+  quotaStatus?: VtoQuotaStatus;
 }
 
 // ponytail: in-memory quota tracking per tokenId; upgrade to Supabase tokens.vto_quota JSONB column when multi-instance scaling is added
@@ -228,6 +233,7 @@ export async function executeVtoPipeline(
       outcome.status === 'queued';
 
     if (isCompleted) {
+      trackPaidExecutionAndDetectSpike('virtual_try_on', FASHN_CREDIT_COST_IDR);
       return {
         ok: true,
         imageUri: outcome.resultImageUri ?? outcome.resultPath ?? undefined,
@@ -239,6 +245,13 @@ export async function executeVtoPipeline(
     if (isProcessing && outcome.providerReference) {
       const pollFn = provider.pollTryOn ?? provider.checkTryOnStatus;
       if (!pollFn) {
+        recordOperationalEvent({
+          category: 'provider_job_failure',
+          severity: 'error',
+          code: 'POLLING_UNSUPPORTED',
+          message: 'Polling not supported by provider',
+          metadata: { provider: 'fashn', category },
+        });
         return {
           ok: false,
           cost: outcome.costEstimateUsd ?? 0,
@@ -265,6 +278,7 @@ export async function executeVtoPipeline(
         const pollCompleted =
           polled.kind === 'completed' || polled.status === 'completed';
         if (pollCompleted) {
+          trackPaidExecutionAndDetectSpike('virtual_try_on', FASHN_CREDIT_COST_IDR);
           return {
             ok: true,
             imageUri:
@@ -280,29 +294,53 @@ export async function executeVtoPipeline(
         const pollFailed =
           polled.kind === 'failed' || polled.status === 'failed';
         if (pollFailed) {
+          const pollError =
+            polled.errorMessage ?? polled.error ?? 'Render gagal diproses';
+          recordOperationalEvent({
+            category: 'provider_job_failure',
+            severity: 'error',
+            code: 'FASHN_POLL_FAILED',
+            message: pollError,
+            metadata: { provider: 'fashn', category },
+          });
           return {
             ok: false,
             cost: outcome.costEstimateUsd ?? 0,
             duration: (outcome.durationMs ?? 0) + lastPolledDuration,
-            error:
-              polled.errorMessage ?? polled.error ?? 'Render gagal diproses',
+            error: pollError,
           };
         }
       }
 
+      const timeoutError = 'Waktu proses Virtual Try-On habis (timeout)';
+      recordOperationalEvent({
+        category: 'provider_job_failure',
+        severity: 'error',
+        code: 'FASHN_POLL_TIMEOUT',
+        message: timeoutError,
+        metadata: { provider: 'fashn', category },
+      });
       return {
         ok: false,
         cost: outcome.costEstimateUsd ?? 0,
         duration: (outcome.durationMs ?? 0) + lastPolledDuration,
-        error: 'Waktu proses Virtual Try-On habis (timeout)',
+        error: timeoutError,
       };
     }
 
+    const stepError = outcome.errorMessage ?? 'Render gagal diproses';
+    recordOperationalEvent({
+      category: 'provider_job_failure',
+      severity: 'error',
+      code: 'FASHN_SUBMIT_FAILED',
+      message: stepError,
+      metadata: { provider: 'fashn', category },
+    });
     return {
       ok: false,
       cost: 0,
       duration: outcome.durationMs ?? 0,
-      error: outcome.errorMessage ?? 'Render gagal diproses',
+      error: stepError,
     };
   };
 
@@ -395,6 +433,10 @@ export interface VtoJobRecord {
   input: {
     analysis_id: string;
     product_id: string;
+    top_product_id?: string | null;
+    bottom_product_id?: string | null;
+    top_used?: boolean;
+    bottom_used?: boolean;
     photo_path: string;
   };
   resultPath: string | null;
@@ -859,6 +901,15 @@ export function createVirtualTryOnService(
       const errorCode =
         error instanceof FashnProviderError ? error.code : 'PROVIDER_ERROR';
 
+      recordOperationalEvent({
+        category: 'provider_job_failure',
+        severity: 'error',
+        code: errorCode,
+        message:
+          error instanceof Error ? error.message : 'FASHN VTO job failed',
+        metadata: { provider: 'fashn', jobId },
+      });
+
       if (repository.recordUsageEvent) {
         await repository.recordUsageEvent({
           id: createId(),
@@ -1126,11 +1177,47 @@ export function createVirtualTryOnService(
     const existingJob = await repository.findByTokenId(input.tokenId);
     let jobId: string;
 
+    const existingInput = (existingJob?.input as Record<string, unknown>) || {};
+    const finalTopProductId =
+      (input.pipelineResult.quotaDeduction.top ? input.topProductId : null) ??
+      (typeof existingInput.top_product_id === 'string'
+        ? existingInput.top_product_id
+        : null);
+    const finalBottomProductId =
+      (input.pipelineResult.quotaDeduction.bottom
+        ? input.bottomProductId
+        : null) ??
+      (typeof existingInput.bottom_product_id === 'string'
+        ? existingInput.bottom_product_id
+        : null);
+    const topUsed = Boolean(finalTopProductId || existingInput.top_used);
+    const bottomUsed = Boolean(
+      finalBottomProductId || existingInput.bottom_used,
+    );
+
     if (existingJob) {
       jobId = existingJob.id;
       await repository.update(jobId, {
         status,
         attemptCount: existingJob.attemptCount + 1,
+        input: {
+          ...existingInput,
+          analysis_id:
+            typeof existingInput.analysis_id === 'string'
+              ? existingInput.analysis_id
+              : '',
+          product_id:
+            finalTopProductId ??
+            finalBottomProductId ??
+            (typeof existingInput.product_id === 'string'
+              ? existingInput.product_id
+              : ''),
+          top_product_id: finalTopProductId,
+          bottom_product_id: finalBottomProductId,
+          top_used: topUsed,
+          bottom_used: bottomUsed,
+          photo_path: input.userPhotoUri,
+        },
         resultPath: input.pipelineResult.finalImageUri ?? existingJob.resultPath,
         error: input.pipelineResult.errorMessage ?? null,
         updatedAt: timestamp,
@@ -1146,7 +1233,11 @@ export function createVirtualTryOnService(
         tokenRecoveryStatus: 'not_needed',
         input: {
           analysis_id: '',
-          product_id: input.topProductId ?? input.bottomProductId ?? '',
+          product_id: finalTopProductId ?? finalBottomProductId ?? '',
+          top_product_id: finalTopProductId,
+          bottom_product_id: finalBottomProductId,
+          top_used: topUsed,
+          bottom_used: bottomUsed,
           photo_path: input.userPhotoUri,
         },
         resultPath: input.pipelineResult.finalImageUri ?? null,
@@ -1199,31 +1290,118 @@ export function createVirtualTryOnService(
 
   async function checkExecutionGuard(
     tokenId: string,
+    requested?: {
+      topProductId?: string | null;
+      bottomProductId?: string | null;
+    },
   ): Promise<VtoExecutionGuardResult> {
     const existingJob = await repository.findByTokenId(tokenId);
+    const memoryQuota = checkVtoQuota(tokenId);
+
+    let topUsed = memoryQuota.topUsed;
+    let bottomUsed = memoryQuota.bottomUsed;
+
     if (existingJob) {
-      if (existingJob.status === 'completed' && existingJob.resultPath) {
-        return {
-          canProceed: false,
-          status: 'completed',
-          cachedResultUri: existingJob.resultPath,
-          message:
-            'Simulasi Virtual Try-On untuk sesi ini telah selesai dan hasilnya sudah tersedia.',
-        };
-      }
       if (existingJob.status === 'processing') {
         return {
           canProceed: false,
           status: 'processing',
           message:
             'Simulasi Virtual Try-On sedang diproses. Mohon tunggu proses selesai.',
+          quotaStatus: memoryQuota,
         };
       }
+
+      if (existingJob.status === 'completed') {
+        const inputData =
+          (existingJob.input as Record<string, unknown>) || {};
+        const jobTopUsed = Boolean(
+          inputData.top_used || inputData.top_product_id,
+        );
+        const jobBottomUsed = Boolean(
+          inputData.bottom_used || inputData.bottom_product_id,
+        );
+
+        if (!jobTopUsed && !jobBottomUsed) {
+          topUsed = true;
+          bottomUsed = true;
+        } else {
+          topUsed = topUsed || jobTopUsed;
+          bottomUsed = bottomUsed || jobBottomUsed;
+        }
+
+        if (topUsed || bottomUsed) {
+          consumeVtoQuota(tokenId, {
+            consumeTop: topUsed,
+            consumeBottom: bottomUsed,
+          });
+        }
+
+        if (topUsed && bottomUsed) {
+          return {
+            canProceed: false,
+            status: 'completed',
+            cachedResultUri: existingJob.resultPath,
+            message:
+              'Simulasi Virtual Try-On untuk sesi ini telah selesai dan hasilnya sudah tersedia.',
+            quotaStatus: {
+              topUsed: true,
+              bottomUsed: true,
+              topsRemaining: 0,
+              bottomsRemaining: 0,
+              canTryTop: false,
+              canTryBottom: false,
+            },
+          };
+        }
+
+        if (requested?.topProductId && topUsed) {
+          return {
+            canProceed: false,
+            status: 'quota_exhausted',
+            message: 'Kuota atasan sudah terpakai untuk sesi ini (1/1).',
+            quotaStatus: {
+              topUsed,
+              bottomUsed,
+              topsRemaining: 0,
+              bottomsRemaining: bottomUsed ? 0 : 1,
+              canTryTop: false,
+              canTryBottom: !bottomUsed,
+            },
+          };
+        }
+
+        if (requested?.bottomProductId && bottomUsed) {
+          return {
+            canProceed: false,
+            status: 'quota_exhausted',
+            message: 'Kuota bawahan sudah terpakai untuk sesi ini (1/1).',
+            quotaStatus: {
+              topUsed,
+              bottomUsed,
+              topsRemaining: topUsed ? 0 : 1,
+              bottomsRemaining: 0,
+              canTryTop: !topUsed,
+              canTryBottom: false,
+            },
+          };
+        }
+      }
     }
+
+    const quotaStatus: VtoQuotaStatus = {
+      topUsed,
+      bottomUsed,
+      topsRemaining: topUsed ? 0 : 1,
+      bottomsRemaining: bottomUsed ? 0 : 1,
+      canTryTop: !topUsed,
+      canTryBottom: !bottomUsed,
+    };
 
     return {
       canProceed: true,
       status: 'idle',
+      quotaStatus,
     };
   }
 

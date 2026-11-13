@@ -4,6 +4,7 @@ import {
   isSupabaseConfigured,
 } from '@/server/dev/local-memory-store';
 import { enforcePaidWorkActive } from '@/server/security/kill-switch';
+import { enforceRateLimit } from '@/server/security/rate-limiter';
 import { createSupabasePhotoStorage } from '@/server/storage/private-photo-storage';
 import {
   createSupabaseTokenService,
@@ -26,6 +27,11 @@ function errorResponse(status: number, error: string, message: string) {
 }
 
 export async function POST(request: Request) {
+  const rateLimited = enforceRateLimit(request, 'virtual_try_on');
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   const killSwitchResponse = await enforcePaidWorkActive();
   if (killSwitchResponse) {
     return killSwitchResponse;
@@ -124,13 +130,16 @@ export async function POST(request: Request) {
     }
 
     const vtoService = createSupabaseVirtualTryOnService();
-    const guard = await vtoService.checkExecutionGuard(resolvedTokenId);
+    const guard = await vtoService.checkExecutionGuard(resolvedTokenId, {
+      topProductId,
+      bottomProductId,
+    });
 
     if (guard.status === 'completed' && guard.cachedResultUri) {
       return NextResponse.json({
         status: 'succeeded',
         result_image_uri: guard.cachedResultUri,
-        quota: {
+        quota: guard.quotaStatus ?? {
           topUsed: true,
           bottomUsed: true,
           topsRemaining: 0,
@@ -143,6 +152,16 @@ export async function POST(request: Request) {
           'Simulasi Virtual Try-On untuk sesi ini telah selesai dan hasilnya sudah tersedia.',
         cached: true,
       });
+    }
+
+    if (guard.status === 'quota_exhausted') {
+      return errorResponse(
+        403,
+        topProductId && guard.quotaStatus?.topUsed
+          ? 'TOP_QUOTA_EXHAUSTED'
+          : 'BOTTOM_QUOTA_EXHAUSTED',
+        guard.message ?? 'Kuota untuk kategori pakaian ini sudah terpakai',
+      );
     }
 
     if (guard.status === 'processing') {

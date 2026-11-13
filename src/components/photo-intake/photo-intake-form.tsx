@@ -412,7 +412,8 @@ export function PhotoIntakeForm({
 
   async function handleRunDualQuotaVto() {
     if (!selectedTopId && !selectedBottomId) return;
-    if (vtoRunning || vtoOutputUri) return;
+    if (vtoRunning) return;
+    if (!vtoQuota.canTryTop && !vtoQuota.canTryBottom) return;
 
     setVtoRunning(true);
     setVtoWarning(null);
@@ -435,17 +436,20 @@ export function PhotoIntakeForm({
         headers.authorization = `Bearer ${tokenSecretForAuth}`;
       }
 
+      const baseUserPhoto =
+        vtoOutputUri ||
+        uploadedBodyPhotoPath ||
+        initialAnalysisComplete?.userPhotoUri ||
+        photos.fullBody?.previewUrl ||
+        'full-body/demo-photo';
+
       const res = await fetch('/api/virtual-try-on', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           top_product_id: selectedTopId,
           bottom_product_id: selectedBottomId,
-          user_photo_uri:
-            uploadedBodyPhotoPath ||
-            initialAnalysisComplete?.userPhotoUri ||
-            photos.fullBody?.previewUrl ||
-            'full-body/demo-photo',
+          user_photo_uri: baseUserPhoto,
           token_id: activeToken,
         }),
       });
@@ -456,24 +460,31 @@ export function PhotoIntakeForm({
         error_message?: string | null;
         message?: string | null;
       };
+
+      const newQuota = data.quota ?? {
+        canTryTop: selectedTopId ? false : vtoQuota.canTryTop,
+        canTryBottom: selectedBottomId ? false : vtoQuota.canTryBottom,
+      };
+
+      setVtoQuota(newQuota);
+
       if (data.result_image_uri) {
         setVtoOutputUri(data.result_image_uri);
         setSelectedTopId(null);
         setSelectedBottomId(null);
-        setVtoQuota({ canTryTop: false, canTryBottom: false });
-        try {
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem(`flicks_vto_${activeToken}`, data.result_image_uri);
+
+        if (!newQuota.canTryTop && !newQuota.canTryBottom) {
+          try {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(
+                `flicks_vto_${activeToken}`,
+                data.result_image_uri,
+              );
+            }
+          } catch {
+            // Ignore storage errors
           }
-        } catch {
-          // Ignore storage errors
         }
-      }
-      if (data.quota && !data.result_image_uri) {
-        setVtoQuota({
-          canTryTop: data.quota.canTryTop,
-          canTryBottom: data.quota.canTryBottom,
-        });
       }
       if (data.warning_message) {
         setVtoWarning(data.warning_message);
@@ -772,19 +783,18 @@ export function PhotoIntakeForm({
                     )}
                     <button
                       type="button"
-                      disabled={!vtoQuota.canTryTop || vtoRunning || Boolean(vtoOutputUri)}
+                      disabled={!vtoQuota.canTryTop || vtoRunning}
                       aria-label={`Pilih Atasan: ${item.name}`}
                       onClick={() => {
-                        if (isSelected) {
-                          setSelectedTopId(null);
-                        } else {
-                          setSelectedTopId(item.id);
-                          setSelectedBottomId(null);
-                        }
+                        setSelectedTopId(isSelected ? null : item.id);
                       }}
                       className={styles.selectProductBtn}
                     >
-                      {isSelected ? 'Terpilih ✓' : 'Pilih Atasan'}
+                      {isSelected
+                        ? 'Terpilih ✓'
+                        : !vtoQuota.canTryTop
+                          ? 'Kuota Habis (0/1)'
+                          : 'Pilih Atasan'}
                     </button>
                   </div>
                 );
@@ -821,19 +831,18 @@ export function PhotoIntakeForm({
                     )}
                     <button
                       type="button"
-                      disabled={!vtoQuota.canTryBottom || vtoRunning || Boolean(vtoOutputUri)}
+                      disabled={!vtoQuota.canTryBottom || vtoRunning}
                       aria-label={`Pilih Bawahan: ${item.name}`}
                       onClick={() => {
-                        if (isSelected) {
-                          setSelectedBottomId(null);
-                        } else {
-                          setSelectedBottomId(item.id);
-                          setSelectedTopId(null);
-                        }
+                        setSelectedBottomId(isSelected ? null : item.id);
                       }}
                       className={styles.selectProductBtn}
                     >
-                      {isSelected ? 'Terpilih ✓' : 'Pilih Bawahan'}
+                      {isSelected
+                        ? 'Terpilih ✓'
+                        : !vtoQuota.canTryBottom
+                          ? 'Kuota Habis (0/1)'
+                          : 'Pilih Bawahan'}
                     </button>
                   </div>
                 );
@@ -847,7 +856,7 @@ export function PhotoIntakeForm({
           {vtoWarning && <p className={styles.vtoWarningBanner}>{vtoWarning}</p>}
 
           <div className={styles.vtoActionRow}>
-            {vtoOutputUri || (!vtoQuota.canTryTop && !vtoQuota.canTryBottom) ? (
+            {!vtoQuota.canTryTop && !vtoQuota.canTryBottom ? (
               <div className={styles.upsellBanner}>
                 <p>Kuota Virtual Try-On sesi ini telah habis (0/1 Atasan, 0/1 Bawahan).</p>
                 <button
@@ -856,7 +865,7 @@ export function PhotoIntakeForm({
                   className={styles.tryOnCtaBtn}
                   style={{ opacity: 0.6, cursor: 'not-allowed', marginBottom: '0.75rem' }}
                 >
-                  VIRTUAL TRY-ON SELESAI (1/1 DIGUNAKAN) ✓
+                  VIRTUAL TRY-ON SELESAI (KUOTA HABIS) ✓
                 </button>
                 <a
                   href={requirePurchasedToken ? '#checkout-section' : '/checkout'}
@@ -874,7 +883,13 @@ export function PhotoIntakeForm({
               >
                 {vtoRunning
                   ? '⏳ MEMPROSES SIMULASI TRY-ON... (MOHON TUNGGU)'
-                  : 'COBA VIRTUAL TRY-ON SEKARANG'}
+                  : selectedTopId && selectedBottomId
+                    ? 'COBA VIRTUAL TRY-ON 1 SETELAN (ATASAN & BAWAHAN)'
+                    : selectedTopId
+                      ? 'COBA VIRTUAL TRY-ON (ATASAN)'
+                      : selectedBottomId
+                        ? 'COBA VIRTUAL TRY-ON (BAWAHAN)'
+                        : 'COBA VIRTUAL TRY-ON SEKARANG'}
               </button>
             )}
           </div>
