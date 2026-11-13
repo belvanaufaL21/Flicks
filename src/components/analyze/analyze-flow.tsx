@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, FlaskConical, Loader2, Lock, QrCode } from "lucide-react";
+import { Check, FlaskConical, Loader2, Lock, QrCode } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import { rupiah } from "@/lib/labels";
 import type { FlowState } from "@/services/session-state.service";
 import { PhotoStep, type Photos } from "./photo-step";
 import { ScanStep } from "./scan-step";
 import { TryOnStep } from "./tryon-step";
-import { CenteredSpinner, ErrorBox, Heading, PrimaryButton, api } from "./ui";
+import { TagButton } from "@/components/ui/tag-button";
+import { CenteredSpinner, ErrorBox, Heading, api } from "./ui";
 
 type Step = "checkout" | "upload" | "analyzing" | "tryon";
 
@@ -312,13 +313,7 @@ function CheckoutStep({
               <QrBox />
             ) : (
               payment.paymentUrl && (
-                <a
-                  href={payment.paymentUrl}
-                  className="group flex w-full items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-                >
-                  <QrCode size={16} /> Buka halaman pembayaran QRIS
-                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-                </a>
+                <TagButton label="Bayar dengan QRIS" href={payment.paymentUrl} fullWidth />
               )
             )}
             {!payment.simulated && (
@@ -347,10 +342,14 @@ function CheckoutStep({
                 Transaksi sebelumnya {payment.status === "expired" ? "kedaluwarsa" : "gagal"}. Buat QR baru untuk mencoba lagi.
               </p>
             )}
-            <PrimaryButton className="w-full" busy={busy} disabled={!state.paidFeaturesEnabled} onClick={start}>
-              {busy ? (free ? "Menyiapkan…" : "Membuka pembayaran…") : free ? "Mulai gratis" : `Bayar ${rupiah(state.priceIdr)} dengan QRIS`}{" "}
-              {!busy && <ArrowRight size={16} />}
-            </PrimaryButton>
+            <TagButton
+              label={free ? "Mulai gratis" : `Bayar ${rupiah(state.priceIdr)}`}
+              ready={state.paidFeaturesEnabled}
+              busy={busy}
+              busyLabel={free ? "Menyiapkan…" : "Membuka pembayaran…"}
+              onClick={start}
+              fullWidth
+            />
             {!state.paidFeaturesEnabled && (
               <p className="mt-3 text-sm text-red-900">Pembelian sedang tidak tersedia. Coba lagi nanti.</p>
             )}

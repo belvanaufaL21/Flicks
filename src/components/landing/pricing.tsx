@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Check, QrCode } from "lucide-react";
+import { TagButton } from "@/components/ui/tag-button";
+import { Check, QrCode } from "lucide-react";
 import { easeOut, fadeUp, Reveal, Stagger } from "@/components/motion/reveal";
-import { Magnetic } from "@/components/motion/shapes";
 import { SectionHeading } from "./section-heading";
 
 const included = [
@@ -111,7 +111,7 @@ export function Pricing() {
           <motion.div
             animate={{ rotate: [-1.6, 1.6] }}
             transition={{ duration: 3.2, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
-            whileHover={{ rotate: 0, y: -6 }}
+            // No hover lift on the card: it would move the start tag out from under the pointer.
             style={{ transformOrigin: "50% -64px" }}
             className="relative pt-16"
           >
@@ -171,15 +171,9 @@ export function Pricing() {
                   ))}
                 </ul>
 
-                <Magnetic strength={0.15} className="mt-10 w-full">
-                  <a
-                    href="/analyze"
-                    className="group flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep"
-                  >
-                    Beli token & mulai
-                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-                  </a>
-                </Magnetic>
+                <div className="mt-10">
+                  <TagButton label="Beli token & mulai" href="/analyze" fullWidth />
+                </div>
                 <p className="mt-4 text-center text-xs text-muted">
                   Token diterbitkan setelah pembayaran terverifikasi. Hasil AI bersifat estimasi.
                 </p>

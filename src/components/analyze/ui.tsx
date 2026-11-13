@@ -22,24 +22,6 @@ export function Heading({ eyebrow, title, children }: { eyebrow: string; title: 
   );
 }
 
-export function PrimaryButton({
-  children,
-  busy,
-  className = "",
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean }) {
-  return (
-    <button
-      {...rest}
-      disabled={rest.disabled || busy}
-      className={`${className} group inline-flex items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-medium text-paper transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:bg-ink/40`}
-    >
-      {busy && <Loader2 size={16} className="animate-spin" />}
-      {children}
-    </button>
-  );
-}
-
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-900/20 bg-red-50 px-4 py-3 text-sm text-red-900">

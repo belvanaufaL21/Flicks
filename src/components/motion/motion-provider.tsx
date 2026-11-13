@@ -22,15 +22,21 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 
 // The landing page has dozens of looping animations. The browser keeps running them
 // even when their section is far off screen, which costs CPU and battery on every
-// frame. This pauses every animation inside a section that is out of view and resumes
-// it when the section comes back. Sections that mount animations later are caught by
-// a light periodic sweep of the off-screen ones.
+// frame. This pauses the looping animations inside a section that is out of view and
+// resumes them when the section comes back. Sections that mount animations later are
+// caught by a light periodic sweep of the off-screen ones.
+//
+// Only endless loops are touched. One-off animations (reveals as a section scrolls in)
+// finish on their own; pausing one mid-way could leave an element stuck part-way, then
+// jump when resumed, which moved the pricing tag out from under the pointer.
 function pauseOffscreenAnimations() {
   if (typeof IntersectionObserver === "undefined" || !document.getAnimations) return;
 
   const offscreen = new Set<Element>();
+  const loops = (el: Element) =>
+    el.getAnimations({ subtree: true }).filter((a) => a.effect?.getTiming().iterations === Infinity);
   const setPaused = (el: Element, paused: boolean) => {
-    for (const a of el.getAnimations({ subtree: true })) {
+    for (const a of loops(el)) {
       if (paused && a.playState === "running") a.pause();
       else if (!paused && a.playState === "paused") a.play();
     }

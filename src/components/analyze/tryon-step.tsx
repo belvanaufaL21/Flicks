@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, Copy, Shirt, Sparkles } from "lucide-react";
+import { Check, Copy, Shirt } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import type { FlowState } from "@/services/session-state.service";
-import { ArchFrame, ErrorBox, Heading, PrimaryButton, api } from "./ui";
+import { TagButton } from "@/components/ui/tag-button";
+import { ArchFrame, ErrorBox, Heading, api } from "./ui";
 
 // Step 4: the visitor's full-body photo is the stage. Tapping a piece selects it and
 // "Pakaikan" dresses the photo in it; the stage then shows the result in place, with a
@@ -168,9 +168,16 @@ export function TryOnStep({
           </div>
 
           {!completed && (
-            <PrimaryButton className="mt-5 w-full" busy={busy || working} disabled={!selected || locked} onClick={dress}>
-              {working || busy ? "Sedang diproses…" : selected ? <>Pakaikan ke fotoku <Sparkles size={16} /></> : "Pilih pakaian dulu"}
-            </PrimaryButton>
+            <div className="mt-6">
+              <TagButton
+                label="Pakaikan ke fotoku"
+                ready={!!selected}
+                busy={busy || working}
+                busyLabel="Sedang memakaikan…"
+                onClick={dress}
+                fullWidth
+              />
+            </div>
           )}
           {error && <div className="mt-4"><ErrorBox message={error} /></div>}
         </div>
@@ -244,13 +251,8 @@ function ReportCard({ state }: { state: FlowState }) {
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent-light">Laporan siap</p>
       <p className="mt-2 font-display text-3xl leading-tight">Personal color, body shape, dan try-on dalam satu halaman.</p>
       <p className="mt-2 text-sm text-paper/70">Tautan rahasia ini aktif 72 jam. Simpan sebelum menutup halaman.</p>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Link
-          href={state.reportPath!}
-          className="inline-flex items-center gap-2 rounded-full bg-paper px-5 py-3 text-sm font-medium text-ink hover:bg-accent-soft"
-        >
-          Buka laporan <ArrowRight size={15} />
-        </Link>
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <TagButton label="Buka laporan" href={state.reportPath!} tone="paper" size="md" />
         <button
           onClick={async () => {
             try {

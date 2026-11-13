@@ -49,6 +49,15 @@ body {
   color: var(--color-ink);
 }
 
+/* Tailwind v4 no longer gives buttons a pointer cursor. Every enabled button (and
+   anything acting as one) shows the hand; disabled ones keep the default. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 section[id] {
   scroll-margin-top: 5rem;
 }

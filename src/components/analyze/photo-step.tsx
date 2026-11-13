@@ -2,18 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Loader2, Plus, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, Loader2, Plus, RefreshCw, X } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import { SweepLine } from "@/components/motion/shapes";
+import { TagButton } from "@/components/ui/tag-button";
 import { prepareBody, prepareFace, warmUp, type CheckId, type Prepared } from "@/lib/photo/prepare";
 import type { FlowState } from "@/services/session-state.service";
-import { ErrorBox, Heading, PrimaryButton } from "./ui";
+import { ErrorBox, Heading } from "./ui";
 
-// Step 2 as a body map. One guide figure in the middle; the photo criteria sit around
-// it as anatomy callouts pointing at the part they are about; the two upload frames
-// sit beside the head (face photo) and beside the waist (full-body photo). Each photo
-// is checked and cropped in the browser the moment it is chosen, and the callouts
-// light up with the result.
+// Step 2 as a tailor's pinboard. A guide figure stands on pattern paper. The full-body photo is pinned on the left at waist height, the face
+// photo on the right at head height, each joined to the figure by a string. Each print
+// carries its own criteria as hang tags tied beneath it, so a criterion always sits next
+// to the photo it judges and lights up the moment that photo is checked (in the
+// browser, where it is also cropped).
 
 export type ReadyPhoto = Extract<Prepared, { ok: true }>;
 export type Photos = { face: ReadyPhoto | null; body: ReadyPhoto | null };
@@ -23,19 +24,28 @@ type Status = "idle" | "ok" | "fail";
 const GUIDE = "/images/model-before.webp"; // 768×1376; anchor points measured on it
 const GUIDE_ASPECT = 1376 / 768;
 
-/** Criteria, each pointing at a spot on the guide figure (percent of the photo). */
-const CRITERIA: { id: string; text: string; kinds: Kind[]; checks: CheckId[]; at: { x: number; y: number }; labelY: number }[] = [
-  { id: "close", text: "Close-up, kepala tidak terpotong", kinds: ["face"], checks: ["face_close"], at: { x: 50, y: 11 }, labelY: 10 },
-  { id: "front", text: "Wajah jelas, menghadap kamera", kinds: ["face"], checks: ["face_one"], at: { x: 49, y: 19 }, labelY: 19.5 },
-  { id: "light", text: "Cahaya siang, tanpa filter", kinds: ["face", "body"], checks: ["light"], at: { x: 46, y: 22.5 }, labelY: 29 },
-  { id: "pose", text: "Berdiri tegak, pakaian pas badan", kinds: ["body"], checks: ["body_one", "body_size"], at: { x: 44, y: 46 }, labelY: 47 },
-  { id: "full", text: "Kepala sampai kaki masuk foto", kinds: ["body"], checks: ["body_full", "body_head"], at: { x: 46, y: 88 }, labelY: 87 },
-];
-
-const SLOTS: Record<Kind, { title: string; short: string; purpose: string; at: { x: number; y: number } }> = {
-  face: { title: "Foto wajah", short: "Wajah", purpose: "Untuk personal color", at: { x: 56, y: 19 } },
-  body: { title: "Foto seluruh badan", short: "Seluruh badan", purpose: "Body shape & try-on", at: { x: 57, y: 46 } },
+/** Each photo's criteria, in the order they are checked. */
+const CRITERIA: Record<Kind, { text: string; checks: CheckId[] }[]> = {
+  face: [
+    { text: "Close-up, kepala utuh", checks: ["face_close"] },
+    { text: "Wajah jelas, menghadap kamera", checks: ["face_one"] },
+    { text: "Cahaya siang, tanpa filter", checks: ["light"] },
+  ],
+  body: [
+    { text: "Berdiri tegak, pakaian pas", checks: ["body_one", "body_size"] },
+    { text: "Kepala sampai kaki", checks: ["body_full", "body_head"] },
+    { text: "Cahaya siang, tanpa filter", checks: ["light"] },
+  ],
 };
+
+/** Where each print's string meets the figure (percent of the guide photo). */
+const SLOTS: Record<Kind, { title: string; caption: string; empty: string; pin: { x: number; y: number }; tilt: number }> = {
+  face: { title: "Foto wajah", caption: "wajahmu", empty: "tempel foto wajah", pin: { x: 57, y: 19 }, tilt: 3.5 },
+  body: { title: "Foto seluruh badan", caption: "badanmu", empty: "tempel foto seluruh badan", pin: { x: 43, y: 46 }, tilt: -3 },
+};
+
+/** Print height ÷ width: the photo, plus the instant-print border and caption strip. */
+const PRINT_RATIO: Record<Kind, number> = { face: 1 + 0.36, body: 4 / 3 + 0.36 };
 
 type Props = {
   state: FlowState;
@@ -50,7 +60,7 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
   const [checking, setChecking] = useState<Kind | null>(null);
   const [rejected, setRejected] = useState<Partial<Record<Kind, { reason: string; checks: Prepared["checks"] }>>>({});
 
-  // Load the detectors while the visitor reads the map.
+  // Load the detectors while the visitor reads the board.
   useEffect(() => {
     warmUp("face");
     const t = setTimeout(() => warmUp("body"), 2500);
@@ -72,19 +82,16 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
     onPhotos({ ...photos, [kind]: result });
   }
 
-  // A criterion is ok once a passing photo covers it, failed if the last attempt failed it.
-  function statusOf(c: (typeof CRITERIA)[number]): Status {
-    let seen = false;
-    for (const kind of c.kinds) {
-      const fail = rejected[kind]?.checks.find((k) => c.checks.includes(k.id) && !k.ok);
-      if (fail) return "fail";
-      const checks = photos[kind]?.checks ?? rejected[kind]?.checks ?? [];
-      if (checks.some((k) => c.checks.includes(k.id) && k.ok)) seen = true;
-    }
-    const allDone = c.kinds.every((k) => photos[k]);
-    return seen && (allDone || c.kinds.length === 1) ? "ok" : "idle";
+  // A criterion fails if the last attempt failed it, passes once a check covering it
+  // passed, and stays neutral until then.
+  function statusOf(kind: Kind, checks: CheckId[]): Status {
+    const last = rejected[kind]?.checks ?? photos[kind]?.checks ?? [];
+    if (last.some((k) => checks.includes(k.id) && !k.ok)) return "fail";
+    if (last.some((k) => checks.includes(k.id) && k.ok)) return "ok";
+    return "idle";
   }
 
+  const tagsFor = (kind: Kind) => CRITERIA[kind].map((c) => ({ text: c.text, status: statusOf(kind, c.checks) }));
   const lastReject = (["body", "face"] as Kind[]).map((k) => rejected[k] && { kind: k, ...rejected[k]! }).find(Boolean);
   const retake = state.analysis?.status === "needs_retake";
   const failed = state.analysis?.status === "failed";
@@ -103,7 +110,7 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
   return (
     <div>
       <Heading eyebrow="Langkah 2 · Foto" title={<>Dua foto, <em className="text-accent">satu peta</em>.</>}>
-        Unggah foto wajah di samping kepala, lalu foto seluruh badan di samping pinggang. Setiap foto langsung diperiksa
+        Tempel foto wajah di samping kepala, lalu foto seluruh badan di samping pinggang. Setiap foto langsung diperiksa
         dan dipotong otomatis.
       </Heading>
 
@@ -125,32 +132,46 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
         </div>
       )}
 
-      <div className="mt-8 rounded-[2.25rem] border border-line bg-paper px-4 py-6 shadow-[0_30px_60px_-40px_rgba(37,34,31,0.45)] sm:px-8 sm:py-8">
-        {/* Desktop: callouts | figure | upload frames. Coordinates are percent of the stage. */}
-        <Stage
-          className="hidden md:block"
-          aspect={1 / (0.32 * GUIDE_ASPECT)}
-          figure={{ left: 34, width: 32 }}
-          slots={{ face: { left: 72, top: 3, width: 14 }, body: { left: 72, top: 35, width: 14 } }}
-          callouts={CRITERIA.map((c) => ({ ...c, status: statusOf(c) }))}
-          slotProps={slotProps}
+      {/* Pattern-paper board */}
+      <div className="relative mt-8 overflow-hidden rounded-[2.25rem] border border-line bg-paper px-4 py-7 shadow-[0_30px_60px_-40px_rgba(37,34,31,0.45)] sm:px-8 sm:py-9">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(154,128,96,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(154,128,96,0.09)_1px,transparent_1px)] [background-size:22px_22px]"
         />
-        {/* Phone: figure | upload frames, criteria as chips underneath. */}
-        <Stage
-          className="md:hidden"
-          aspect={1 / (0.52 * GUIDE_ASPECT)}
-          figure={{ left: 0, width: 52 }}
-          slots={{ face: { left: 62, top: 2, width: 34 }, body: { left: 62, top: 48, width: 34 } }}
-          callouts={[]}
-          slotProps={slotProps}
-        />
-        <ul className="mt-5 flex flex-wrap gap-2 md:hidden">
-          {CRITERIA.map((c) => (
-            <li key={c.id}>
-              <CriterionChip text={c.text} status={statusOf(c)} />
-            </li>
-          ))}
-        </ul>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent-soft/60 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-accent-soft/50 blur-3xl" />
+
+        <div className="relative">
+          {/* Desktop: body print + its tags | figure | face print + its tags. */}
+          <Stage
+            className="hidden md:block"
+            aspect={1 / (0.28 * GUIDE_ASPECT)}
+            figure={{ left: 36, width: 28 }}
+            columns={{ body: { left: 3, top: 13, width: 28, print: 14 }, face: { left: 69, top: 0, width: 28, print: 15 } }}
+            tags={{ body: tagsFor("body"), face: tagsFor("face") }}
+            slotProps={slotProps}
+          />
+          {/* Phone: body print | figure | face print, tags in two columns underneath. */}
+          <Stage
+            className="md:hidden"
+            aspect={1 / (0.38 * GUIDE_ASPECT)}
+            figure={{ left: 31, width: 38 }}
+            columns={{ body: { left: 0, top: 30, width: 29, print: 28 }, face: { left: 71, top: 2, width: 29, print: 28 } }}
+            tags={null}
+            slotProps={slotProps}
+          />
+          <div className="mt-6 grid grid-cols-2 gap-3 md:hidden">
+            {(["body", "face"] as Kind[]).map((k) => (
+              <ul key={k} className="flex flex-col items-center gap-2.5">
+                {tagsFor(k).map((t, i) => (
+                  <li key={t.text}>
+                    <HangTag text={t.text} status={t.status} tilt={i % 2 ? 1.2 : -1.2} compact />
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
+        </div>
 
         <AnimatePresence>
           {lastReject && (
@@ -160,7 +181,7 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               role="alert"
-              className="mt-6 flex items-start gap-3 rounded-2xl border border-red-900/15 bg-red-50 px-4 py-3 text-sm text-red-900"
+              className="relative mt-7 flex items-start gap-3 rounded-2xl border border-red-900/15 bg-red-50 px-4 py-3 text-sm text-red-900"
             >
               <X size={16} className="mt-0.5 shrink-0" />
               <p>
@@ -169,35 +190,41 @@ export function PhotoStep({ state, photos, onPhotos, onSubmit, submitError }: Pr
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Consent: one line, then go. */}
-        <div className="mt-6 flex flex-col gap-4 border-t border-dashed border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <label className={`flex cursor-pointer items-start gap-3 text-sm ${ready ? "text-ink" : "text-muted"}`}>
-            <input
-              type="checkbox"
-              checked={consent}
-              disabled={!ready}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent-deep)]"
-            />
-            <span>
-              Saya setuju fotoku dianalisis AI dan dihapus otomatis setelah 72 jam.
-              <span className="mt-0.5 block text-xs text-muted">Diproses Gemini (via OpenRouter) &amp; FASHN, tanpa dipakai untuk pelatihan.</span>
-            </span>
-          </label>
-          <PrimaryButton className="shrink-0 sm:w-auto" disabled={!ready || !consent} onClick={onSubmit}>
-            Mulai analisis <Sparkles size={16} />
-          </PrimaryButton>
-        </div>
-        {submitError && <div className="mt-4"><ErrorBox message={submitError} /></div>}
       </div>
+
+      {/* Consent and start, outside the board. */}
+      <div className="mt-7 flex flex-col gap-5 px-1 sm:flex-row sm:items-center sm:justify-between sm:gap-14">
+        <label className={`flex cursor-pointer items-start gap-3 text-sm ${ready ? "text-ink" : "text-muted"}`}>
+          <input
+            type="checkbox"
+            checked={consent}
+            disabled={!ready}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent-deep)]"
+          />
+          <span>
+            Saya setuju fotoku dianalisis AI dan dihapus otomatis setelah 72 jam.
+            <span className="mt-0.5 block text-xs text-muted">Diproses Gemini (via OpenRouter) &amp; FASHN, tanpa dipakai untuk pelatihan.</span>
+          </span>
+        </label>
+        <TagButton
+          label="Mulai analisis"
+          ready={ready && consent}
+          onClick={onSubmit}
+          fullWidth
+          className="sm:ml-0 sm:w-auto"
+        />
+      </div>
+      {submitError && <div className="mt-4"><ErrorBox message={submitError} /></div>}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------------
 
-type Box = { left: number; top?: number; width: number };
+/** A column holding one print (and on desktop its tags); all values in percent of the stage. */
+type Column = { left: number; top: number; width: number; print: number };
+type TagView = { text: string; status: Status };
 type SlotProps = {
   kind: Kind;
   photo: ReadyPhoto | null;
@@ -208,139 +235,190 @@ type SlotProps = {
   onFile: (f: File | undefined) => void;
 };
 
+/** A soft S-curve from (x1,y1) to (x2,y2): reads as a string, not a ruler line. */
+const curve = (x1: number, y1: number, x2: number, y2: number) => {
+  const mx = (x1 + x2) / 2;
+  return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+};
+
 /**
- * The map. Everything is placed in percent of the stage, whose aspect is fixed so the
- * guide figure keeps its proportions and the anchor points stay on the right body part.
+ * The board. Everything is placed in percent of the stage, whose aspect is fixed so the
+ * guide figure keeps its proportions and the pins stay on the head and the waist.
  */
 function Stage({
   className,
   aspect,
   figure,
-  slots,
-  callouts,
+  columns,
+  tags,
   slotProps,
 }: {
   className: string;
   aspect: number;
-  figure: Box;
-  slots: Record<Kind, Box>;
-  callouts: ((typeof CRITERIA)[number] & { status: Status })[];
+  figure: { left: number; width: number };
+  columns: Record<Kind, Column>;
+  tags: Record<Kind, TagView[]> | null;
   slotProps: (k: Kind) => SlotProps;
 }) {
-  const fx = (x: number) => figure.left + (x / 100) * figure.width; // figure % -> stage x %
-  // Slot height in % of stage height: its width is % of stage width.
-  const slotH = (kind: Kind) => slots[kind].width * (kind === "face" ? 1 : 4 / 3) * aspect;
-  const kinds = Object.keys(slots) as Kind[];
+  const kinds = Object.keys(columns) as Kind[];
+  const fx = (x: number) => figure.left + (x / 100) * figure.width; // guide % -> stage x %
+  // Where each string ends: the print's inner edge (facing the figure), at its middle.
+  const printEnd = (k: Kind) => {
+    const c = columns[k];
+    const printLeft = c.left + (c.width - c.print) / 2;
+    const x = k === "face" ? printLeft + 1 : printLeft + c.print - 1;
+    const y = c.top + (c.print * PRINT_RATIO[k] * aspect) / 2;
+    return { x, y };
+  };
 
   return (
     <div className={`relative w-full ${className}`} style={{ aspectRatio: String(aspect) }}>
-      {/* Guide figure */}
-      <div
-        className="absolute inset-y-0 overflow-hidden rounded-t-full rounded-b-[1.75rem] bg-cream ring-1 ring-line"
+      {/* Guide figure, blended into the paper */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: easeOut }}
+        className="absolute inset-y-0 overflow-hidden rounded-t-full rounded-b-[1.5rem] bg-[radial-gradient(ellipse_at_50%_35%,#f4ead9,#e6d7bf_70%)]"
         style={{ left: `${figure.left}%`, width: `${figure.width}%` }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- static guide image, decorative */}
-        <img src={GUIDE} alt="" className="h-full w-full object-cover opacity-80 saturate-[0.55]" />
-        <span className="absolute inset-x-0 bottom-3 mx-auto w-fit rounded-full bg-paper/90 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
-          Contoh pose
-        </span>
-      </div>
+        <img src={GUIDE} alt="" className="h-full w-full object-cover opacity-90 mix-blend-multiply saturate-[0.6]" />
+        <span className="absolute inset-x-0 bottom-3 text-center font-display text-sm italic text-muted max-sm:hidden">contoh pose</span>
+      </motion.div>
 
-      {/* Leader lines */}
+      {/* Strings from the figure to the prints */}
       <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {callouts.map((c) => (
-          <line
-            key={c.id}
-            x1={figure.left - 3.5}
-            y1={c.labelY}
-            x2={fx(c.at.x)}
-            y2={c.at.y}
-            vectorEffect="non-scaling-stroke"
-            strokeWidth={1.25}
-            strokeDasharray={c.status === "ok" ? undefined : "4 4"}
-            className={c.status === "ok" ? "stroke-accent-deep" : c.status === "fail" ? "stroke-red-700" : "stroke-accent/60"}
-          />
-        ))}
-        {kinds.map((k) => {
-          const cy = (slots[k].top ?? 0) + slotH(k) / 2;
+        {kinds.map((k, i) => {
+          const end = printEnd(k);
           const done = !!slotProps(k).photo;
           return (
-            <line
+            <motion.path
               key={k}
-              x1={fx(SLOTS[k].at.x)}
-              y1={SLOTS[k].at.y}
-              x2={slots[k].left}
-              y2={cy}
+              d={curve(fx(SLOTS[k].pin.x), SLOTS[k].pin.y, end.x, end.y)}
+              fill="none"
               vectorEffect="non-scaling-stroke"
               strokeWidth={1.25}
-              strokeDasharray={done ? undefined : "4 4"}
-              className={done ? "stroke-accent-deep" : "stroke-accent/60"}
+              strokeDasharray={done ? undefined : "3 5"}
+              className={`${done ? "stroke-accent-deep" : "stroke-accent/60"} transition-colors duration-500`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 + i * 0.15, ease: easeOut }}
             />
           );
         })}
       </svg>
 
-      {/* Anchor dots on the figure */}
-      {[
-        ...callouts.map((c) => ({ id: c.id, ...c.at, status: c.status })),
-        ...kinds.map((k) => ({ id: k, ...SLOTS[k].at, status: (slotProps(k).photo ? "ok" : "idle") as Status })),
-      ].map((a) => (
-        <span
-          key={`dot-${a.id}`}
-          className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: `${fx(a.x)}%`, top: `${a.y}%` }}
-        >
-          {a.status === "idle" && <span className="absolute inset-0 animate-ping rounded-full bg-accent/50" />}
+      {/* Pins on the head and the waist */}
+      {kinds.map((k) => {
+        const done = !!slotProps(k).photo;
+        return (
           <span
-            className={`relative block h-full w-full rounded-full ring-2 ring-paper ${
-              a.status === "ok" ? "bg-accent-deep" : a.status === "fail" ? "bg-red-700" : "bg-accent"
-            }`}
-          />
-        </span>
-      ))}
+            key={`pin-${k}`}
+            className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${fx(SLOTS[k].pin.x)}%`, top: `${SLOTS[k].pin.y}%` }}
+          >
+            {!done && <span className="absolute inset-0 animate-ping rounded-full bg-accent/45" />}
+            <span className={`relative block h-full w-full rounded-full ring-2 ring-paper transition-colors ${done ? "bg-accent-deep" : "bg-accent"}`} />
+          </span>
+        );
+      })}
 
-      {/* Callouts (desktop) */}
-      {callouts.map((c) => (
-        <div key={c.id} className="absolute -translate-y-1/2" style={{ right: `${100 - (figure.left - 3.5)}%`, top: `${c.labelY}%` }}>
-          <CriterionChip text={c.text} status={c.status} />
-        </div>
-      ))}
-
-      {/* Upload frames */}
-      {kinds.map((k) => (
-        <div key={k} className="absolute" style={{ left: `${slots[k].left}%`, top: `${slots[k].top ?? 0}%`, width: `${slots[k].width}%` }}>
-          <UploadSlot {...slotProps(k)} />
-        </div>
-      ))}
+      {/* Prints, each with its tags tied underneath (desktop) */}
+      {kinds.map((k) => {
+        const c = columns[k];
+        return (
+          <div
+            key={k}
+            className="absolute flex flex-col items-center"
+            style={{ left: `${c.left}%`, top: `${c.top}%`, width: `${c.width}%` }}
+          >
+            <div style={{ width: `${(c.print / c.width) * 100}%` }}>
+              <Print {...slotProps(k)} />
+            </div>
+            {tags && (
+              <ul className="relative mt-4 flex flex-col items-center gap-2.5">
+                {/* the thread the tags hang on */}
+                <span aria-hidden="true" className="absolute -top-4 bottom-4 left-1/2 w-px -translate-x-1/2 bg-accent/40" />
+                {tags[k].map((t, i) => (
+                  <motion.li
+                    key={t.text}
+                    className="relative"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.45, delay: 0.3 + i * 0.08, ease: easeOut }}
+                  >
+                    <HangTag text={t.text} status={t.status} tilt={(i % 2 ? 1.5 : -1.5) * (k === "face" ? 1 : -1)} />
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function CriterionChip({ text, status }: { text: string; status: Status }) {
+/** A hang tag: punched hole, criterion, and a stamp once it has been checked. */
+function HangTag({ text, status, tilt, compact = false }: { text: string; status: Status; tilt: number; compact?: boolean }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border bg-paper px-3 py-1.5 text-xs shadow-sm transition-colors ${
-        status === "ok" ? "border-accent-deep/40 text-ink" : status === "fail" ? "border-red-700/40 text-red-900" : "border-line text-muted"
+    <motion.span
+      animate={{ rotate: tilt, scale: status === "idle" ? 1 : [1, 1.06, 1] }}
+      transition={{ duration: 0.45, ease: easeOut }}
+      className={`relative inline-flex items-center gap-2 rounded-[0.9rem] border py-1.5 pl-2 pr-3 shadow-[0_8px_18px_-12px_rgba(37,34,31,0.5)] transition-colors duration-500 ${
+        compact ? "max-w-[10.5rem]" : "whitespace-nowrap"
+      } ${
+        status === "ok"
+          ? "border-accent-deep/30 bg-accent-soft"
+          : status === "fail"
+            ? "border-red-700/30 bg-red-50"
+            : "border-line bg-paper"
       }`}
     >
+      <span className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+        {status === "idle" ? (
+          // the punched hole the thread goes through
+          <span className="h-2.5 w-2.5 rounded-full bg-cream shadow-[inset_0_1px_2px_rgba(37,34,31,0.35)] ring-1 ring-line" />
+        ) : (
+          <motion.span
+            initial={{ scale: 1.8, opacity: 0, rotate: -20 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 16 }}
+            className={`flex h-5 w-5 items-center justify-center rounded-full text-paper ${status === "ok" ? "bg-accent-deep" : "bg-red-700"}`}
+          >
+            {status === "ok" ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
+          </motion.span>
+        )}
+      </span>
       <span
-        className={`flex h-4 w-4 items-center justify-center rounded-full ${
-          status === "ok" ? "bg-accent-deep text-paper" : status === "fail" ? "bg-red-700 text-paper" : "border border-line"
+        className={`font-display italic leading-tight ${compact ? "text-[13px]" : "text-[15px] leading-none"} ${
+          status === "fail" ? "text-red-900" : "text-ink"
         }`}
       >
-        {status === "ok" ? <Check size={10} /> : status === "fail" ? <X size={10} /> : null}
+        {text}
       </span>
-      {text}
-    </span>
+    </motion.span>
   );
 }
 
-function UploadSlot({ kind, photo, checking, busy, rejected, locked, onFile }: SlotProps) {
+/** An instant print taped to the board: the upload target, then the chosen photo. */
+function Print({ kind, photo, checking, busy, rejected, locked, onFile }: SlotProps) {
   const slot = SLOTS[kind];
   const inputId = `photo-${kind}`;
   const disabled = locked || busy;
   return (
-    <div>
+    <motion.div
+      initial={{ opacity: 0, y: -16, rotate: slot.tilt * 2 }}
+      animate={{ opacity: locked ? 0.55 : 1, y: 0, rotate: slot.tilt }}
+      whileHover={disabled ? undefined : { rotate: 0, y: -4, scale: 1.03 }}
+      transition={{ type: "spring", stiffness: 220, damping: 18 }}
+      className="relative"
+    >
+      {/* washi tape */}
+      <span
+        aria-hidden="true"
+        className="absolute -top-2.5 left-1/2 z-10 h-5 w-[46%] -translate-x-1/2 rotate-[-3deg] bg-accent-light/55 shadow-sm [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]"
+      />
       <label
         htmlFor={disabled ? undefined : inputId}
         onDragOver={(e) => e.preventDefault()}
@@ -348,52 +426,61 @@ function UploadSlot({ kind, photo, checking, busy, rejected, locked, onFile }: S
           e.preventDefault();
           if (!disabled) onFile(e.dataTransfer.files[0]);
         }}
-        className={`group relative block overflow-hidden rounded-2xl bg-cream transition ${kind === "face" ? "aspect-square" : "aspect-[3/4]"} ${
-          photo
-            ? "shadow-[0_18px_30px_-18px_rgba(37,34,31,0.55)] ring-2 ring-accent-deep"
-            : rejected
-              ? "border-2 border-dashed border-red-700/50"
-              : "border-2 border-dashed border-accent/50"
-        } ${disabled ? "cursor-default" : "cursor-pointer hover:border-accent-deep"} ${locked ? "opacity-50" : ""}`}
+        className={`block bg-white p-[6%] pb-0 shadow-[0_22px_34px_-20px_rgba(37,34,31,0.55)] ring-1 transition ${
+          rejected && !photo ? "ring-red-700/40" : "ring-black/5"
+        } ${disabled ? "cursor-default" : "cursor-pointer"}`}
       >
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element -- local preview of the cropped photo
-          <img src={photo.url} alt={`${slot.title} yang dipakai`} className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        {checking && (
-          <>
-            <span className="absolute inset-0 bg-paper/50" />
-            <SweepLine from="8%" to="92%" duration={1.6} className="inset-x-2 h-0.5 rounded-full bg-accent shadow-[0_0_12px_3px_rgba(154,128,96,0.6)]" />
-            <span className="absolute inset-0 flex items-center justify-center">
-              <Loader2 size={18} className="animate-spin text-accent-deep" />
+        <span className={`relative block overflow-hidden bg-cream ${kind === "face" ? "aspect-square" : "aspect-[3/4]"}`}>
+          <AnimatePresence>
+            {photo && (
+              <motion.img
+                key={photo.url}
+                src={photo.url}
+                alt={`${slot.title} yang dipakai`}
+                initial={{ opacity: 0, filter: "brightness(1.6) saturate(0)" }}
+                animate={{ opacity: 1, filter: "brightness(1) saturate(1)" }}
+                transition={{ duration: 1.1, ease: easeOut }}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+          </AnimatePresence>
+          {checking && (
+            <>
+              <span className="absolute inset-0 bg-paper/50" />
+              <SweepLine from="8%" to="92%" duration={1.6} className="inset-x-1 h-0.5 rounded-full bg-accent shadow-[0_0_12px_3px_rgba(154,128,96,0.6)]" />
+              <span className="absolute inset-0 flex items-center justify-center">
+                <Loader2 size={18} className="animate-spin text-accent-deep" />
+              </span>
+            </>
+          )}
+          {!photo && !checking && (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 border border-dashed border-accent/50 p-2 text-center">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-paper text-accent-deep shadow-sm">
+                {locked ? <span className="text-xs">2</span> : <Plus size={16} />}
+              </span>
+              <span className="text-[11px] leading-tight text-muted">{locked ? "setelah foto wajah" : slot.empty}</span>
             </span>
-          </>
-        )}
-        {!photo && !checking && (
-          <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2 text-center">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-paper text-accent-deep shadow-sm transition-transform group-hover:scale-110">
-              <Plus size={16} />
+          )}
+          {photo && !checking && (
+            <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent-deep text-paper shadow">
+              <Check size={13} />
             </span>
-            <span className="text-[11px] font-medium leading-tight text-ink sm:text-xs">{slot.title}</span>
-          </span>
-        )}
-        {photo && !checking && (
-          <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-accent-deep text-paper shadow">
-            <Check size={13} />
-          </span>
-        )}
+          )}
+        </span>
+        {/* caption strip, written like a note on the print */}
+        <span className="flex h-[1.9rem] items-center justify-center font-display text-sm italic text-ink/80 sm:h-[2.3rem] sm:text-base">
+          {slot.caption}
+        </span>
       </label>
-
-      <div className="mt-1.5 flex items-center justify-between gap-1">
-        <p className="truncate text-[11px] leading-tight text-muted">
-          {locked ? "Setelah foto wajah" : checking ? "Memeriksa…" : photo ? slot.short : slot.purpose}
-        </p>
-        {photo && !busy && (
-          <label htmlFor={inputId} className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted hover:text-ink">
-            <RefreshCw size={10} /> Ganti
-          </label>
-        )}
-      </div>
+      {photo && !busy && (
+        <label
+          htmlFor={inputId}
+          aria-label={`Ganti ${slot.title.toLowerCase()}`}
+          className="absolute left-[9%] top-[7%] z-10 flex cursor-pointer items-center gap-1 rounded-full bg-paper/90 px-2 py-1 text-[10px] font-medium text-ink shadow hover:bg-paper"
+        >
+          <RefreshCw size={10} /> <span className="max-sm:hidden">Ganti</span>
+        </label>
+      )}
       <input
         id={inputId}
         type="file"
@@ -405,7 +492,7 @@ function UploadSlot({ kind, photo, checking, busy, rejected, locked, onFile }: S
           e.target.value = "";
         }}
       />
-    </div>
+    </motion.div>
   );
 }
 
