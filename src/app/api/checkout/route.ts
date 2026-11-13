@@ -23,6 +23,32 @@ export async function POST(request?: Request) {
     }
   }
 
+  // Free trial / demo checkout: issues instant token without Midtrans
+  if (config.freeCheckout) {
+    try {
+      const sessionHash = await ensureSessionHash();
+      const payment = await startCheckout(sessionHash);
+      return NextResponse.json(
+        {
+          payment_id: payment.id,
+          provider_reference: payment.providerReference,
+          amount: payment.amount,
+          currency: payment.currency,
+          status: payment.status,
+          snap_token: '',
+          redirect_url: '',
+          qris_url: '',
+          orderId: payment.providerReference,
+          paymentUrl: null,
+          state: await getFlowState(sessionHash, await readReportSecret()),
+        },
+        { status: 201 },
+      );
+    } catch (err) {
+      return errorResponse(502, 'PROVIDER_ERROR', (err as Error).message);
+    }
+  }
+
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
     (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() && !process.env.SUPABASE_SECRET_KEY?.trim()) ||

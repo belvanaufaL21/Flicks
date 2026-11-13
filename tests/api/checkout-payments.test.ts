@@ -29,6 +29,7 @@ vi.mock('@/server/payments/midtrans.service', async (importOriginal) => {
 import { POST as checkoutPOST } from '@/app/api/checkout/route';
 import { GET as paymentStatusGET } from '@/app/api/payments/[paymentId]/route';
 import { POST as webhookPOST } from '@/app/api/webhooks/midtrans/route';
+import { config } from '@/lib/config';
 
 function createInMemoryRepos() {
   const payments = new Map<string, PaymentRecord>();
@@ -349,5 +350,21 @@ describe('Checkout & Payment Polling API Routes with Token Handover (Section 2)'
     );
     const failedCheckoutRes = await checkoutPOST();
     expect(failedCheckoutRes.status).toBe(502);
+  });
+
+  it('POST /api/checkout with freeCheckout issues a paid trial token directly without calling Snap', async () => {
+    const originalFree = config.freeCheckout;
+    try {
+      (config as { freeCheckout: boolean }).freeCheckout = true;
+      const res = await checkoutPOST();
+      const body = (await res.json()) as Record<string, unknown>;
+      if (res.status !== 201) console.error('freeCheckout failed:', body);
+      expect(res.status).toBe(201);
+      expect(body.status).toBe('paid');
+      expect(String(body.orderId)).toMatch(/^FREE-/);
+      expect(snapProvider.createSnapTransaction).not.toHaveBeenCalled();
+    } finally {
+      (config as { freeCheckout: boolean }).freeCheckout = originalFree;
+    }
   });
 });

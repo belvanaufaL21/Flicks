@@ -53,7 +53,9 @@ export const config = {
   // photos stay with the processors named in the privacy notice.
   openrouter: {
     get mode() {
-      return providerMode(env.OPENROUTER_API_KEY?.trim());
+      const mode = providerMode(env.OPENROUTER_API_KEY?.trim());
+      // ponytail: fallback to mock in demo/trial mode so flow is testable without paid API key
+      return mode === "missing" && env.FREE_CHECKOUT === "true" ? "mock" : mode;
     },
     apiKey: env.OPENROUTER_API_KEY?.trim(),
     baseUrl: "https://openrouter.ai/api/v1",
@@ -95,7 +97,8 @@ export const config = {
 
   // Signs short-lived URLs for private photos. A per-process fallback is fine in
   // development; production must set a fixed value so URLs survive restarts.
-  mediaSigningSecret: env.MEDIA_SIGNING_SECRET ?? (isProduction ? undefined : devFallbackSecret()),
+  // ponytail: fallback to CRON_SECRET if MEDIA_SIGNING_SECRET is omitted
+  mediaSigningSecret: env.MEDIA_SIGNING_SECRET ?? env.CRON_SECRET ?? (isProduction ? undefined : devFallbackSecret()),
 
   // Analysis cost comes from OpenRouter's reported charge per call. FASHN still uses
   // the PRD §I planning estimate until real invoices are in.
@@ -120,8 +123,8 @@ export function missingSettings(): string[] {
     NEXT_PUBLIC_SUPABASE_URL: config.supabase.url,
     SUPABASE_SECRET_KEY: config.supabase.secretKey,
     MEDIA_SIGNING_SECRET: config.mediaSigningSecret,
-    OPENROUTER_API_KEY: config.openrouter.mode !== "missing",
-    FASHN_API_KEY: config.fashn.mode !== "missing",
+    OPENROUTER_API_KEY: config.freeCheckout || config.openrouter.mode !== "missing",
+    FASHN_API_KEY: config.freeCheckout || config.fashn.mode !== "missing",
     // Not needed while trial mode hands out tokens without payment.
     MIDTRANS_SERVER_KEY: config.freeCheckout || config.midtrans.mode !== "missing",
   };
