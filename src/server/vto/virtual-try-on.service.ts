@@ -1250,31 +1250,53 @@ export function createVirtualTryOnService(
     }
 
     if (repository.recordUsageEvent) {
-      const creditsUsed =
-        (input.pipelineResult.quotaDeduction.top ? 1 : 0) +
-        (input.pipelineResult.quotaDeduction.bottom ? 1 : 0);
+      const { top: topDeducted, bottom: bottomDeducted } =
+        input.pipelineResult.quotaDeduction;
 
-      if (creditsUsed > 0) {
+      if (topDeducted) {
         await repository.recordUsageEvent({
           id: createId(),
           jobId,
           provider: 'fashn',
           feature: 'virtual_try_on',
-          model: 'tryon-v1.6',
+          model: 'tryon-v1.6 (atasan)',
           inputTokens: null,
           outputTokens: null,
-          estimatedCostIdr: creditsUsed * FASHN_CREDIT_COST_IDR,
+          estimatedCostIdr: FASHN_CREDIT_COST_IDR,
           status: 'completed',
           errorCode: null,
           createdAt: timestamp,
         });
-      } else if (!isSuccess) {
+      }
+
+      if (bottomDeducted) {
         await repository.recordUsageEvent({
           id: createId(),
           jobId,
           provider: 'fashn',
           feature: 'virtual_try_on',
-          model: 'tryon-v1.6',
+          model: 'tryon-v1.6 (bawahan)',
+          inputTokens: null,
+          outputTokens: null,
+          estimatedCostIdr: FASHN_CREDIT_COST_IDR,
+          status: 'completed',
+          errorCode: null,
+          createdAt: timestamp,
+        });
+      }
+
+      if (!topDeducted && !bottomDeducted && !isSuccess) {
+        const failedPart = input.topProductId
+          ? ' (atasan)'
+          : input.bottomProductId
+            ? ' (bawahan)'
+            : '';
+        await repository.recordUsageEvent({
+          id: createId(),
+          jobId,
+          provider: 'fashn',
+          feature: 'virtual_try_on',
+          model: `tryon-v1.6${failedPart}`,
           inputTokens: null,
           outputTokens: null,
           estimatedCostIdr: 0,

@@ -73,11 +73,12 @@ describe('VTO Pipeline Job & Usage Recording (Admin Dashboard visibility)', () =
     expect(usageEvents[0].jobId).toBe(result.jobId);
     expect(usageEvents[0].provider).toBe('fashn');
     expect(usageEvents[0].feature).toBe('virtual_try_on');
+    expect(usageEvents[0].model).toBe('tryon-v1.6 (bawahan)');
     expect(usageEvents[0].estimatedCostIdr).toBe(FASHN_CREDIT_COST_IDR);
     expect(usageEvents[0].status).toBe('completed');
   });
 
-  it('records 2 credits cost when both top and bottom succeed', async () => {
+  it('records 2 distinct usage events (atasan & bawahan, 1 credit each) when both succeed', async () => {
     const { repo, usageEvents } = createMockRepo();
     const service = createVirtualTryOnService(repo);
 
@@ -96,9 +97,17 @@ describe('VTO Pipeline Job & Usage Recording (Admin Dashboard visibility)', () =
       },
     });
 
-    expect(usageEvents.length).toBe(1);
-    expect(usageEvents[0].estimatedCostIdr).toBe(2 * FASHN_CREDIT_COST_IDR);
+    expect(usageEvents.length).toBe(2);
+    expect(usageEvents[0].model).toBe('tryon-v1.6 (atasan)');
+    expect(usageEvents[0].estimatedCostIdr).toBe(FASHN_CREDIT_COST_IDR);
     expect(usageEvents[0].status).toBe('completed');
+
+    expect(usageEvents[1].model).toBe('tryon-v1.6 (bawahan)');
+    expect(usageEvents[1].estimatedCostIdr).toBe(FASHN_CREDIT_COST_IDR);
+    expect(usageEvents[1].status).toBe('completed');
+
+    const totalCost = usageEvents.reduce((sum, e) => sum + e.estimatedCostIdr, 0);
+    expect(totalCost).toBe(2 * FASHN_CREDIT_COST_IDR);
   });
 
   it('updates existing job when user executes a second try-on on the same token', async () => {
@@ -144,5 +153,7 @@ describe('VTO Pipeline Job & Usage Recording (Admin Dashboard visibility)', () =
 
     // But should record a second usage event for the second credit
     expect(usageEvents.length).toBe(2);
+    expect(usageEvents[0].model).toBe('tryon-v1.6 (atasan)');
+    expect(usageEvents[1].model).toBe('tryon-v1.6 (bawahan)');
   });
 });

@@ -472,7 +472,20 @@ export function AdminFinancialsSection({
                           {ev.provider}
                         </strong>
                       </td>
-                      <td className={styles.tableCell}>{ev.feature}</td>
+                      <td className={styles.tableCell}>
+                        <div>{ev.feature}</div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                          {ev.feature === 'personal_color'
+                            ? 'Analisis Wajah'
+                            : ev.feature === 'body_shape'
+                              ? 'Analisis Tubuh'
+                              : ev.model.includes('(atasan)')
+                                ? 'Virtual Try-On (Atasan)'
+                                : ev.model.includes('(bawahan)')
+                                  ? 'Virtual Try-On (Bawahan)'
+                                  : 'Virtual Try-On'}
+                        </span>
+                      </td>
                       <td className={styles.tableCell}>
                         <span
                           style={{
