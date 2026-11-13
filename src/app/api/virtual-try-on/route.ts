@@ -17,6 +17,10 @@ import {
   createSupabaseVirtualTryOnService,
   executeVtoPipeline,
 } from '@/server/vto/virtual-try-on.service';
+import { errorResponse as browserErrorResponse, json, tooManyRequests } from '@/lib/http/respond';
+import { readSessionHash } from '@/lib/session';
+import { FlowError } from '@/services/analysis.service';
+import { startTryon } from '@/services/tryon.service';
 
 export const maxDuration = 60;
 
@@ -37,17 +41,11 @@ export async function POST(request: Request) {
     return killSwitchResponse;
   }
 
-  if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
-    return errorResponse(
-      503,
-      'INTERNAL_ERROR',
-      'Virtual try-on service is not configured',
-    );
-  }
-
   let body: {
     analysis_id?: unknown;
     product_id?: unknown;
+    analysisId?: unknown;
+    productId?: unknown;
     top_product_id?: unknown;
     bottom_product_id?: unknown;
     photo_path?: unknown;
@@ -58,6 +56,32 @@ export async function POST(request: Request) {
     body = (await request.json()) as typeof body;
   } catch {
     return errorResponse(400, 'INVALID_PHOTO', 'Request body must be JSON');
+  }
+
+  // Browser session flow (Belva's frontend TryOnStep)
+  const isBrowserFlow =
+    !request.headers.get('authorization') &&
+    (typeof body.analysisId === 'string' || typeof body.productId === 'string');
+
+  if (isBrowserFlow) {
+    try {
+      const sessionHash = await readSessionHash();
+      if (!sessionHash) throw new FlowError('Sesi tidak ditemukan.', 401);
+      const analysisId = typeof body.analysisId === 'string' ? body.analysisId : '';
+      const productId = typeof body.productId === 'string' ? body.productId : '';
+      const job = await startTryon({ sessionHash, analysisId, productId });
+      return json({ id: job.id, status: job.status });
+    } catch (err) {
+      return browserErrorResponse(err);
+    }
+  }
+
+  if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
+    return errorResponse(
+      503,
+      'INTERNAL_ERROR',
+      'Virtual try-on service is not configured',
+    );
   }
 
   // Dual-quota sequential chaining path (top_product_id and/or bottom_product_id)
@@ -202,7 +226,7 @@ export async function POST(request: Request) {
             'Foto seluruh tubuh tidak ditemukan di penyimpanan',
           );
         }
-      } catch (err) {
+      } catch {
         return errorResponse(
           500,
           'STORAGE_ERROR',
@@ -283,23 +307,23 @@ export async function POST(request: Request) {
     );
   }
 
-    // Input validation at API boundary
-    const PHOTO_PATH_PATTERN = /^(face|full-body)\/[a-zA-Z0-9_-]{1,128}$/;
-    const ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+  // Input validation at API boundary
+  const PHOTO_PATH_PATTERN = /^(face|full-body)\/[a-zA-Z0-9_-]{1,128}$/;
+  const ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
-    if (typeof body.photo_path !== 'string' || !PHOTO_PATH_PATTERN.test(body.photo_path)) {
-      return errorResponse(400, 'INVALID_PHOTO', 'Invalid photo_path format');
-    }
-    if (typeof body.analysis_id !== 'string' || !ID_PATTERN.test(body.analysis_id)) {
-      return errorResponse(404, 'JOB_NOT_FOUND', 'Invalid analysis job ID');
-    }
-    if (typeof body.product_id !== 'string' || !ID_PATTERN.test(body.product_id)) {
-      return errorResponse(
-        400,
-        'INVALID_PRODUCT',
-        'Invalid product ID',
-      );
-    }
+  if (typeof body.photo_path !== 'string' || !PHOTO_PATH_PATTERN.test(body.photo_path)) {
+    return errorResponse(400, 'INVALID_PHOTO', 'Invalid photo_path format');
+  }
+  if (typeof body.analysis_id !== 'string' || !ID_PATTERN.test(body.analysis_id)) {
+    return errorResponse(404, 'JOB_NOT_FOUND', 'Invalid analysis job ID');
+  }
+  if (typeof body.product_id !== 'string' || !ID_PATTERN.test(body.product_id)) {
+    return errorResponse(
+      400,
+      'INVALID_PRODUCT',
+      'Invalid product ID',
+    );
+  }
 
   if (!process.env.FASHN_API_KEY?.trim()) {
     return errorResponse(
@@ -388,4 +412,5 @@ export async function POST(request: Request) {
     },
     { status: 201 },
   );
+}
 }

@@ -1,29 +1,20 @@
-import { NextResponse } from 'next/server';
-import {
-  canUseLocalDevFallback,
-  isSupabaseConfigured,
-} from '@/server/dev/local-memory-store';
-import { createSupabaseVirtualTryOnService } from '@/server/vto/virtual-try-on.service';
+import { connection } from "next/server";
+import { json } from "@/lib/http/respond";
+import { getStore } from "@/lib/store";
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
+// Only active products are listed or selectable (WEB-07).
 export async function GET() {
-  if (!isSupabaseConfigured() && !canUseLocalDevFallback()) {
-    return NextResponse.json(
-      { error: 'INTERNAL_ERROR', message: 'Catalog service is not configured' },
-      { status: 503 },
-    );
-  }
-
-  try {
-    const products =
-      await createSupabaseVirtualTryOnService().listActiveProducts();
-    return NextResponse.json({ products }, { status: 200 });
-  } catch {
-    return NextResponse.json(
-      { error: 'INTERNAL_ERROR', message: 'Failed to load active products' },
-      { status: 500 },
-    );
-  }
+  await connection();
+  return json(
+    (await getStore().activeProducts()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      brand: p.brand,
+      category: p.category,
+      subcategory: p.subcategory,
+      image: p.imagePath,
+      silhouette: p.labels.silhouette,
+    })),
+  );
+}
 }

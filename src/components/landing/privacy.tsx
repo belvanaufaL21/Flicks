@@ -32,7 +32,7 @@ const points = [
   {
     icon: Server,
     title: "Pihak ketiga yang jelas",
-    body: "Foto diproses oleh Google Gemini (analisis warna & bentuk tubuh) dan FASHN (virtual try-on). Kami sebutkan sebelum kamu upload.",
+    body: "Foto diproses oleh Google Gemini melalui OpenRouter (analisis warna & bentuk tubuh) dan FASHN (virtual try-on). Kami sebutkan sebelum kamu upload.",
   },
   {
     icon: Timer,
@@ -274,21 +274,28 @@ function LockStage() {
 
 function ProviderStage() {
   const providers = [
-    { name: "Google Gemini", role: "Warna & bentuk tubuh", top: "22%" },
+    { name: "OpenRouter · Gemini", role: "Warna & bentuk tubuh", top: "22%" },
     { name: "FASHN", role: "Virtual try-on", top: "60%" },
   ];
   return (
     <StageLayer>
       {/* Data packets travelling from the photo to each provider */}
       {providers.map((p, i) => (
+        // The layer spans the container and moves with translateX, so "50%"→"88%" matches
+        // the old `left` animation without running layout every frame.
         <motion.span
           key={`dot-${p.name}`}
-          initial={{ left: "50%", opacity: 0 }}
-          animate={{ left: ["50%", "88%"], opacity: [0, 1, 0] }}
+          aria-hidden="true"
+          initial={{ x: "50%", opacity: 0 }}
+          animate={{ x: ["50%", "88%"], opacity: [0, 1, 0] }}
           transition={{ duration: 1.2, repeat: Infinity, delay: 0.3 + i * 0.5, ease: "easeInOut" }}
-          style={{ top: `calc(${p.top} + 18px)` }}
-          className="absolute h-2 w-2 rounded-full bg-accent-light shadow-[0_0_10px_rgba(201,179,143,0.9)]"
-        />
+          className="pointer-events-none absolute inset-0"
+        >
+          <span
+            style={{ top: `calc(${p.top} + 18px)` }}
+            className="absolute left-0 h-2 w-2 rounded-full bg-accent-light shadow-[0_0_10px_rgba(201,179,143,0.9)]"
+          />
+        </motion.span>
       ))}
       {providers.map((p, i) => (
         <motion.div

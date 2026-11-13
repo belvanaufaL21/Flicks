@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll, useSpring } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
@@ -52,9 +53,9 @@ export function Navbar() {
         className="fixed inset-x-0 top-0 z-50 px-4 pt-3 sm:px-6"
       >
         <nav
-          className={`mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-3 transition-[background-color,box-shadow,backdrop-filter] duration-500 ${
+          className={`mx-auto flex max-w-6xl items-center justify-between rounded-full px-5 py-3 transition-[background-color,box-shadow] duration-500 ${
             scrolled || open
-              ? "bg-paper/80 shadow-[0_8px_30px_-12px_rgba(37,34,31,0.25)] backdrop-blur-xl"
+              ? "bg-paper/90 shadow-[0_8px_30px_-12px_rgba(37,34,31,0.25)] backdrop-blur-md"
               : "bg-transparent"
           }`}
         >
@@ -70,12 +71,12 @@ export function Navbar() {
             ))}
           </ul>
           <div className="flex items-center gap-2">
-            <a
-              href="#harga"
+            <Link
+              href="/analyze"
               className="hidden rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-accent-deep sm:inline-block"
             >
               Mulai analisis
-            </a>
+            </Link>
             <button
               type="button"
               onClick={() => setOpen((o) => !o)}
@@ -95,7 +96,7 @@ export function Navbar() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12, scale: 0.98 }}
               transition={{ duration: 0.3, ease: easeOut }}
-              className="mx-auto mt-2 max-w-6xl rounded-3xl bg-paper/95 p-4 shadow-xl backdrop-blur-xl md:hidden"
+              className="mx-auto mt-2 max-w-6xl rounded-3xl bg-paper p-4 shadow-xl md:hidden"
             >
               <ul className="flex flex-col">
                 {links.map((l, i) => (
@@ -115,13 +116,13 @@ export function Navbar() {
                   </motion.li>
                 ))}
               </ul>
-              <a
-                href="#harga"
+              <Link
+                href="/analyze"
                 onClick={() => setOpen(false)}
                 className="mt-2 block rounded-full bg-ink px-5 py-3 text-center text-sm font-medium text-paper"
               >
                 Mulai analisis
-              </a>
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>

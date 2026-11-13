@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef } from "react";
+import { TagButton } from "@/components/ui/tag-button";
 import Image from "next/image";
 import { motion, useMotionValue, useScroll, useSpring, useTransform } from "motion/react";
-import { ArrowRight, ScanLine } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
-import { Magnetic } from "@/components/motion/shapes";
+import { SweepLine } from "@/components/motion/shapes";
 
 const headline = [
   { text: "Kenali warnamu." },
@@ -125,17 +126,7 @@ export function Hero() {
             transition={{ duration: 0.8, ease: easeOut, delay: 0.85 }}
             className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4 pl-10 sm:pl-11"
           >
-            <Magnetic>
-              <a
-                href="#harga"
-                className="group inline-flex items-center gap-3 rounded-full bg-ink py-2 pl-6 pr-2 text-sm font-medium text-paper shadow-lg shadow-ink/20 transition-colors hover:bg-accent-deep"
-              >
-                Mulai analisis
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink transition-transform group-hover:translate-x-0.5">
-                  <ArrowRight size={15} />
-                </span>
-              </a>
-            </Magnetic>
+            <TagButton label="Mulai analisis" href="/analyze" size="md" className="-ml-1 sm:ml-0" />
             <a
               href="#cara-kerja"
               className="group text-sm font-medium text-ink underline decoration-ink/25 underline-offset-[6px] transition-colors hover:decoration-ink"
@@ -237,10 +228,11 @@ export function Hero() {
                 ))}
 
                 {/* scan line */}
-                <motion.div
-                  animate={{ top: ["14%", "80%", "14%"] }}
-                  transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
-                  className="absolute inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
+                <SweepLine
+                  from="14%"
+                  to="80%"
+                  duration={4}
+                  className="inset-x-5 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.45)]"
                 />
 
                 <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-2xl bg-paper/95 px-3 py-2.5 text-xs text-ink">

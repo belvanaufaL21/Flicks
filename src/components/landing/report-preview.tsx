@@ -13,7 +13,7 @@ import {
 import Image from "next/image";
 import { AlertTriangle, Braces, Clock, Info, Lock } from "lucide-react";
 import { easeOut, fadeUp, Reveal, staggerParent } from "@/components/motion/reveal";
-import { DomeSection } from "@/components/motion/shapes";
+import { DomeSection, SweepLine } from "@/components/motion/shapes";
 import { SectionHeading } from "./section-heading";
 
 const tabs = [
@@ -360,10 +360,11 @@ function QualityOverlay() {
       ].map((p) => (
         <span key={p} className={`absolute h-7 w-7 rounded-sm border-paper ${p}`} />
       ))}
-      <motion.div
-        animate={{ top: ["10%", "92%", "10%"] }}
-        transition={{ duration: 3.2, ease: "easeInOut", repeat: Infinity }}
-        className="absolute inset-x-3 h-0.5 rounded-full bg-paper/90 shadow-[0_0_18px_4px_rgba(250,248,244,0.6)]"
+      <SweepLine
+        from="10%"
+        to="92%"
+        duration={3.2}
+        className="inset-x-3 h-0.5 rounded-full bg-paper/90 shadow-[0_0_18px_4px_rgba(250,248,244,0.6)]"
       />
     </motion.div>
   );

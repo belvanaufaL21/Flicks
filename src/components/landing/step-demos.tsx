@@ -5,6 +5,7 @@ import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, Clock, Link2, Lock, ScanLine, ShieldCheck, Sparkles, X } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
+import { SweepLine } from "@/components/motion/shapes";
 import { brand } from "@/lib/brand";
 
 // Looping, coded walk-throughs of each step, shown inside a phone frame.
@@ -283,10 +284,12 @@ export function PayDemo({ active }: DemoProps) {
           <p className={label}>Scan untuk bayar</p>
           <div className="relative mt-4 grid grid-cols-11 gap-[2px] rounded-2xl bg-paper p-3.5 shadow-[0_18px_30px_-16px_rgba(37,34,31,0.45)] ring-1 ring-line">
             {/* Scanner sweep over the code */}
-            <motion.span
-              animate={{ top: ["8%", "86%", "8%"] }}
-              transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
-              className="pointer-events-none absolute inset-x-6 z-10 h-0.5 rounded-full bg-accent/80 shadow-[0_0_14px_3px_rgba(154,128,96,0.5)]"
+            <SweepLine
+              from="8%"
+              to="86%"
+              duration={2}
+              layerClassName="z-10"
+              className="inset-x-6 h-0.5 rounded-full bg-accent/80 shadow-[0_0_14px_3px_rgba(154,128,96,0.5)]"
             />
             {qrCells.map((on, i) => (
               <motion.span
@@ -408,7 +411,7 @@ export function UploadDemo({ active }: DemoProps) {
         <Screen key="consent">
           <p className={label}>Persetujuan</p>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            Foto diproses oleh Google Gemini dan FASHN, disimpan privat, dan terhapus sesuai masa
+            Foto diproses oleh Google Gemini (via OpenRouter) dan FASHN, disimpan privat, dan terhapus sesuai masa
             retensi 72 jam.
           </p>
           <div className="relative mt-5 flex items-start gap-3 rounded-2xl border border-line p-3 text-xs">
@@ -488,10 +491,11 @@ export function AnalyzeDemo({ active }: DemoProps) {
       <Image src="/images/model-before.webp" alt="" fill sizes="240px" className="object-cover object-top" />
 
       {phase === 0 && (
-        <motion.div
-          animate={{ top: ["12%", "78%", "12%"] }}
-          transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity }}
-          className="absolute inset-x-4 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.5)]"
+        <SweepLine
+          from="12%"
+          to="78%"
+          duration={2.4}
+          className="inset-x-4 h-0.5 rounded-full bg-accent shadow-[0_0_24px_6px_rgba(154,128,96,0.5)]"
         />
       )}
 

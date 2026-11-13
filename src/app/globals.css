@@ -31,6 +31,15 @@ body {
   height: 100%;
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* Lenis animates the scroll itself; native smooth scrolling would fight it. */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -45,6 +54,15 @@ html.lenis {
 body {
   background: var(--color-cream);
   color: var(--color-ink);
+}
+
+/* Tailwind v4 no longer gives buttons a pointer cursor. Every enabled button (and
+   anything acting as one) shows the hand; disabled ones keep the default. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 section[id] {
