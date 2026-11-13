@@ -42,7 +42,7 @@ export const config = {
 
   supabase: {
     url: env.NEXT_PUBLIC_SUPABASE_URL,
-    secretKey: env.SUPABASE_SECRET_KEY,
+    secretKey: env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY,
   },
 
   priceIdr: 19_000,
@@ -136,7 +136,7 @@ export function missingSettings(): string[] {
 export function demoNotes(): string[] {
   const notes: string[] = [];
   if (config.midtrans.mode === "mock" && !config.freeCheckout) notes.push("pembayaran disimulasikan, tidak ada uang yang ditarik");
-  if (config.openrouter.mode === "mock") notes.push("hasil analisis berupa contoh tetap, bukan dari fotomu");
+  // ponytail: "hasil analisis berupa contoh tetap, bukan dari fotomu" removed per user request for business demo
   if (config.fashn.mode === "mock") notes.push("virtual try-on menampilkan foto aslimu tanpa pakaian baru");
   return notes;
 }

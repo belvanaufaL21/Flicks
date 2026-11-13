@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Analysis, Payment, Photo, Product, Token, TryonJob } from "@/types/domain";
+import { rowToProduct } from "./product-mapper";
 import type { PhotoMeta, Store } from "./types";
 
 // Supabase-backed store. Server-only: it uses the secret key, which bypasses RLS.
@@ -129,19 +130,7 @@ const toPhotoMeta = (r: Row): PhotoMeta => ({
   expiresAt: r.expires_at as string,
 });
 
-const toProduct = (r: Row): Product => ({
-  id: r.id as string,
-  name: r.name as string,
-  brand: r.brand as string,
-  category: r.category as string,
-  subcategory: r.subcategory as string,
-  imagePath: r.image_path as string,
-  sourceUrl: (r.source_url as string) ?? null,
-  labels: r.labels as Product["labels"],
-  isActive: r.is_active as boolean,
-  createdAt: r.created_at as string,
-  updatedAt: r.updated_at as string,
-});
+const toProduct = (r: Row): Product => rowToProduct(r);
 
 function renamePatch(patch: object, map: Record<string, string>): Row {
   const out: Row = {};

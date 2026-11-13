@@ -62,7 +62,6 @@ export async function getReport(secret: string): Promise<ReportView> {
   return {
     state: "ready",
     demoNotes: [
-      ...(analysis.modelMetadata?.provider === "mock" ? ["hasil analisis di bawah adalah contoh tetap, bukan dari fotomu"] : []),
       ...(job?.provider === "mock" ? ["gambar try-on adalah foto aslimu tanpa pakaian baru"] : []),
     ],
     createdAt: analysis.completedAt ?? analysis.createdAt,

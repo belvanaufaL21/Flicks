@@ -111,13 +111,15 @@ export function AnalyzeFlow() {
   const faceShot = { url: photos.face?.url ?? analysis?.facePhotoUrl ?? null, points: photos.face?.points ?? [] };
   const bodyShot = { url: photos.body?.url ?? analysis?.bodyPhotoUrl ?? null, points: photos.body?.points ?? [] };
 
+  const activeDemoNotes = (state?.demoNotes ?? []).filter((n) => !n.includes("contoh tetap"));
+
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6">
-      {state && state.demoNotes.length > 0 && (
+      {state && activeDemoNotes.length > 0 && (
         <div className="mx-auto mb-6 flex max-w-3xl items-start gap-3 rounded-2xl border border-accent/40 bg-accent-soft/60 px-4 py-3 text-sm text-accent-deep">
           <FlaskConical size={18} className="mt-0.5 shrink-0" />
           <p>
-            <span className="font-semibold">Mode demo:</span> {state.demoNotes.join("; ")}.
+            <span className="font-semibold">Mode demo:</span> {activeDemoNotes.join("; ")}.
           </p>
         </div>
       )}

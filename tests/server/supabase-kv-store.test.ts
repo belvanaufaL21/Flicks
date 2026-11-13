@@ -7,6 +7,33 @@ describe("createSupabaseKvStore", () => {
     const memoryKv = new Map<string, any>();
     const mockClient = {
       from(table: string) {
+        if (table === "products") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    order() {
+                      return Promise.resolve({
+                        data: [
+                          {
+                            id: "prod_mock_db_1",
+                            name: "Mock Shirt",
+                            category: "tops",
+                            subcategory: "Atasan",
+                            image_path: "https://example.com/shirt.png",
+                            is_active: true,
+                          },
+                        ],
+                        error: null,
+                      });
+                    },
+                  };
+                },
+              };
+            },
+          };
+        }
         expect(table).toBe("system_settings");
         return {
           select() {

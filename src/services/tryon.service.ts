@@ -58,10 +58,19 @@ export async function startTryon(args: { sessionHash: string; analysisId: string
   if (!person) throw new FlowError("Foto sudah dihapus sesuai kebijakan retensi.", 410);
 
   try {
-    const garmentBytes = await readFile(path.join(process.cwd(), "public", product.imagePath));
+    let garmentBytes: Uint8Array;
+    if (product.imagePath.startsWith("http://") || product.imagePath.startsWith("https://")) {
+      const res = await fetch(product.imagePath);
+      if (!res.ok) throw new Error(`Gagal mengunduh gambar produk: status ${res.status}`);
+      garmentBytes = new Uint8Array(await res.arrayBuffer());
+    } else {
+      const fileBuffer = await readFile(path.join(process.cwd(), "public", product.imagePath));
+      garmentBytes = new Uint8Array(fileBuffer);
+    }
+
     const providerJobId = await submitTryon({
       person,
-      garment: { bytes: new Uint8Array(garmentBytes), mime: mimeFromPath(product.imagePath) },
+      garment: { bytes: garmentBytes, mime: mimeFromPath(product.imagePath) },
       category: product.labels.fashnCategory,
     });
     return (await store.updateTryonJob(job.id, { providerJobId, status: "processing" }))!;
@@ -145,7 +154,8 @@ function logUsage(job: TryonJob, ok: boolean, detail: string | null) {
 }
 
 function mimeFromPath(p: string) {
-  if (p.endsWith(".png")) return "image/png";
-  if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+  const clean = p.split("?")[0].toLowerCase();
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "image/jpeg";
   return "image/webp";
 }

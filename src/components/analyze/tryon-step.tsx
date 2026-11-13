@@ -42,8 +42,12 @@ export function TryOnStep({
 
   const groups = useMemo(() => {
     const map = new Map<string, Product[]>();
-    for (const p of products ?? []) map.set(p.category, [...(map.get(p.category) ?? []), p]);
-    return [...map.entries()];
+    for (const p of products ?? []) {
+      const cat = p.category || "Atasan";
+      map.set(cat, [...(map.get(cat) ?? []), p]);
+    }
+    const order: Record<string, number> = { Atasan: 1, Bawahan: 2, Terusan: 3 };
+    return [...map.entries()].sort(([a], [b]) => (order[a] ?? 99) - (order[b] ?? 99));
   }, [products]);
 
   async function dress() {
@@ -143,7 +147,7 @@ export function TryOnStep({
                 className="absolute bottom-4 left-4 flex items-center gap-2.5 rounded-2xl bg-paper/95 p-2 pr-4 shadow-lg"
               >
                 <span className="relative h-12 w-10 overflow-hidden rounded-xl bg-cream">
-                  <Image src={chosen.image} alt="" fill sizes="40px" className="object-cover" />
+                  <Image src={chosen.image} alt="" fill sizes="40px" className="object-cover" unoptimized={chosen.image.startsWith("http")} />
                 </span>
                 <span className="text-xs">
                   <span className="block text-muted">Dipilih</span>
@@ -216,7 +220,7 @@ export function TryOnStep({
                           active ? "ring-2 ring-accent-deep" : "ring-line group-hover:ring-accent"
                         }`}
                       >
-                        <Image src={p.image} alt={p.name} fill loading="eager" sizes="(min-width: 768px) 15vw, 30vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <Image src={p.image} alt={p.name} fill loading="eager" sizes="(min-width: 768px) 15vw, 30vw" className="object-cover transition-transform duration-500 group-hover:scale-105" unoptimized={p.image.startsWith("http")} />
                         {active && (
                           <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-deep text-paper">
                             <Check size={12} />
@@ -224,7 +228,9 @@ export function TryOnStep({
                         )}
                       </span>
                       <span className="mt-1.5 block truncate text-sm font-medium text-ink">{p.name}</span>
-                      <span className="block truncate text-[11px] text-muted">{p.subcategory}</span>
+                      <span className="block truncate text-[11px] text-muted">
+                        {p.brand && p.brand !== "FLICKS" ? `${p.brand} · ${p.subcategory}` : p.subcategory}
+                      </span>
                     </button>
                   );
                 })}

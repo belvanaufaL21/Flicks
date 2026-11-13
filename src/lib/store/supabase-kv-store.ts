@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Analysis, Payment, Photo, Product, Token, TryonJob, UsageEvent } from "@/types/domain";
+import { rowToProduct } from "./product-mapper";
 import { seedProducts } from "./seed-products";
 import type { PhotoMeta, Store } from "./types";
 
@@ -346,9 +347,33 @@ export function createSupabaseKvStore(url: string, secretKey: string, client?: S
     },
 
     async activeProducts() {
+      try {
+        const { data, error } = await db
+          .from("products")
+          .select()
+          .eq("is_active", true)
+          .order("created_at", { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return data.map((r) => rowToProduct(r as Record<string, unknown>));
+        }
+      } catch (err) {
+        console.warn("[supabase-kv-store] activeProducts db warning (falling back to memory):", err);
+      }
       return [...tables.products.values()].filter((p) => p.isActive);
     },
     async product(id) {
+      try {
+        const { data, error } = await db
+          .from("products")
+          .select()
+          .eq("id", id)
+          .maybeSingle();
+        if (!error && data) {
+          return rowToProduct(data as Record<string, unknown>);
+        }
+      } catch (err) {
+        console.warn("[supabase-kv-store] product db warning (falling back to memory):", err);
+      }
       return tables.products.get(id) ?? null;
     },
 
