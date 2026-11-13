@@ -3,11 +3,12 @@ import type { NextConfig } from "next";
 // ponytail: static CSP via next.config.ts headers() covers soft-launch without custom proxy overhead; upgrade to per-request nonce CSP if inline Next.js hydration scripts must be locked down further.
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.sandbox.midtrans.com https://api.midtrans.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.sandbox.midtrans.com https://api.midtrans.com https://cdn.jsdelivr.net https://storage.googleapis.com",
+  "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
