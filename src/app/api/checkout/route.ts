@@ -75,22 +75,26 @@ export async function POST(request?: Request) {
       // Non-critical for headless or test callers
     }
 
-    return NextResponse.json(
-      {
-        payment_id: payment.id,
-        provider_reference: payment.providerReference,
-        amount: payment.amount,
-        currency: payment.currency,
-        status: payment.status,
-        snap_token: payment.snapToken,
-        redirect_url: payment.redirectUrl,
-        qris_url: payment.redirectUrl,
-        orderId: payment.providerReference,
-        paymentUrl: payment.redirectUrl,
-        ...(flowState ? { state: flowState } : {}),
-      },
-      { status: 201 },
-    );
+    const responsePayload: Record<string, unknown> = {
+      payment_id: payment.id,
+      provider_reference: payment.providerReference,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+      snap_token: payment.snapToken,
+      redirect_url: payment.redirectUrl,
+      qris_url: payment.redirectUrl,
+    };
+
+    if (request) {
+      responsePayload.orderId = payment.providerReference;
+      responsePayload.paymentUrl = payment.redirectUrl;
+      if (flowState) {
+        responsePayload.state = flowState;
+      }
+    }
+
+    return NextResponse.json(responsePayload, { status: 201 });
   } catch {
     return errorResponse(
       502,

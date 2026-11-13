@@ -33,7 +33,10 @@ export async function GET(
       const reportService = createSupabaseReportService();
       const result = await reportService.getReportBySecret(secret);
 
-      if (result.status === 'ready' && result.payload) {
+      if (
+        (result.status === 'active' || (result as unknown as { status: string }).status === 'ready') &&
+        result.payload
+      ) {
         return NextResponse.json(result.payload, {
           status: 200,
           headers: {
@@ -79,5 +82,4 @@ export async function GET(
   }
 
   return errorResponse(404, 'REPORT_NOT_FOUND', 'Report not found');
-}
 }

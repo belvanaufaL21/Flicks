@@ -52,10 +52,13 @@ describe('Checkout-to-Upload E2E Flow (Section 4)', () => {
   const originalRevokeObjectURL = URL.revokeObjectURL;
   const originalScrollIntoView = Element.prototype.scrollIntoView;
 
+  const originalAnalyzePageVariant = process.env.ANALYZE_PAGE_VARIANT;
+
   beforeEach(() => {
     vi.restoreAllMocks();
     document.head.innerHTML = '';
     delete window.snap;
+    process.env.ANALYZE_PAGE_VARIANT = 'intake';
     process.env.MIDTRANS_CLIENT_KEY = 'SB-Mid-client-e2e';
     delete process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
     process.env.MIDTRANS_IS_PRODUCTION = 'false';
@@ -78,6 +81,10 @@ describe('Checkout-to-Upload E2E Flow (Section 4)', () => {
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
     Element.prototype.scrollIntoView = originalScrollIntoView;
+
+    if (originalAnalyzePageVariant === undefined)
+      delete process.env.ANALYZE_PAGE_VARIANT;
+    else process.env.ANALYZE_PAGE_VARIANT = originalAnalyzePageVariant;
 
     if (originalClientKey === undefined) delete process.env.MIDTRANS_CLIENT_KEY;
     else process.env.MIDTRANS_CLIENT_KEY = originalClientKey;

@@ -229,5 +229,3 @@ export async function POST(request: Request) {
     return errorResponse(500, 'INTERNAL_ERROR', 'Failed to create analysis job');
   }
 }
-  }
-}
