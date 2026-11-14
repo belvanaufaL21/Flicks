@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     product_id?: unknown;
     analysisId?: unknown;
     productId?: unknown;
+    topProductId?: unknown;
+    bottomProductId?: unknown;
     top_product_id?: unknown;
     bottom_product_id?: unknown;
     photo_path?: unknown;
@@ -61,7 +63,10 @@ export async function POST(request: Request) {
   // Browser session flow (Belva's frontend TryOnStep)
   const isBrowserFlow =
     !request.headers.get('authorization') &&
-    (typeof body.analysisId === 'string' || typeof body.productId === 'string');
+    (typeof body.analysisId === 'string' ||
+      typeof body.productId === 'string' ||
+      typeof body.topProductId === 'string' ||
+      typeof body.bottomProductId === 'string');
 
   if (isBrowserFlow) {
     try {
@@ -69,7 +74,9 @@ export async function POST(request: Request) {
       if (!sessionHash) throw new FlowError('Sesi tidak ditemukan.', 401);
       const analysisId = typeof body.analysisId === 'string' ? body.analysisId : '';
       const productId = typeof body.productId === 'string' ? body.productId : '';
-      const job = await startTryon({ sessionHash, analysisId, productId });
+      const topProductId = typeof body.topProductId === 'string' ? body.topProductId : undefined;
+      const bottomProductId = typeof body.bottomProductId === 'string' ? body.bottomProductId : undefined;
+      const job = await startTryon({ sessionHash, analysisId, productId, topProductId, bottomProductId });
       return json({ id: job.id, status: job.status });
     } catch (err) {
       return browserErrorResponse(err);

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy, Shirt } from "lucide-react";
+import { Check, Copy, ExternalLink, Shirt, Sparkles } from "lucide-react";
 import { easeOut } from "@/components/motion/reveal";
 import type { FlowState } from "@/services/session-state.service";
 import { TagButton } from "@/components/ui/tag-button";
@@ -11,9 +11,18 @@ import { ArchFrame, ErrorBox, Heading, api } from "./ui";
 
 // Step 4: the visitor's full-body photo is the stage. Tapping a piece selects it and
 // "Pakaikan" dresses the photo in it; the stage then shows the result in place, with a
-// before/after toggle. The package includes one try-on, so the choice locks once sent.
+// before/after toggle. Users get a quota of 1 top and 1 bottom.
 
-type Product = { id: string; name: string; brand: string; category: string; subcategory: string; image: string; silhouette: string[] };
+type Product = {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  subcategory: string;
+  image: string;
+  silhouette: string[];
+  sourceUrl?: string | null;
+};
 
 export function TryOnStep({
   state,
@@ -25,20 +34,60 @@ export function TryOnStep({
   onState: (s: FlowState) => void;
 }) {
   const [products, setProducts] = useState<Product[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(state.tryon?.productId ?? null);
+  const [selectedTop, setSelectedTop] = useState<string | null>(null);
+  const [selectedBottom, setSelectedBottom] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"after" | "before">("after");
 
   useEffect(() => {
-    api<Product[]>("/api/products").then(setProducts, (e) => setError(e.message));
-  }, []);
+    api<Product[]>("/api/products").then((prods) => {
+      setProducts(prods);
+      if (state.tryon?.productId) {
+        const ids = state.tryon.productId.split(",").map((s) => s.trim());
+        for (const id of ids) {
+          const match = prods.find((p) => p.id === id);
+          if (match?.category === "Bawahan") {
+            setSelectedBottom(id);
+          } else {
+            setSelectedTop(id);
+          }
+        }
+      }
+    }, (e) => setError(e.message));
+  }, [state.tryon?.productId]);
 
   const job = state.tryon;
   const working = job?.status === "queued" || job?.status === "processing";
   const completed = job?.status === "completed";
   const locked = working || completed;
-  const chosen = products?.find((p) => p.id === (job && job.status !== "failed" ? job.productId : selected)) ?? null;
+
+  const jobProductIds = useMemo(() => {
+    return job && job.status !== "failed" && job.productId
+      ? job.productId.split(",").map((s) => s.trim())
+      : [];
+  }, [job]);
+
+  const chosenTop = useMemo(() => {
+    if (jobProductIds.length > 0) {
+      return products?.find((p) => jobProductIds.includes(p.id) && (p.category === "Atasan" || p.category !== "Bawahan")) ?? null;
+    }
+    return products?.find((p) => p.id === selectedTop) ?? null;
+  }, [products, jobProductIds, selectedTop]);
+
+  const chosenBottom = useMemo(() => {
+    if (jobProductIds.length > 0) {
+      return products?.find((p) => jobProductIds.includes(p.id) && p.category === "Bawahan") ?? null;
+    }
+    return products?.find((p) => p.id === selectedBottom) ?? null;
+  }, [products, jobProductIds, selectedBottom]);
+
+  const canTryTop = !completed || !chosenTop;
+  const canTryBottom = !completed || !chosenBottom;
+
+  const chosenItems = [chosenTop, chosenBottom].filter(Boolean) as Product[];
+  const chosenNames = chosenItems.map((p) => p.name).join(" & ");
+  const hasSelection = !!(selectedTop || selectedBottom);
 
   const groups = useMemo(() => {
     const map = new Map<string, Product[]>();
@@ -50,15 +99,37 @@ export function TryOnStep({
     return [...map.entries()].sort(([a], [b]) => (order[a] ?? 99) - (order[b] ?? 99));
   }, [products]);
 
+  function toggleSelect(p: Product) {
+    if (locked || busy) return;
+    const isBawahan = p.category === "Bawahan";
+    if (isBawahan) {
+      setSelectedBottom((prev) => (prev === p.id ? null : p.id));
+    } else {
+      setSelectedTop((prev) => (prev === p.id ? null : p.id));
+    }
+  }
+
+  function isProductActive(p: Product) {
+    if (jobProductIds.length > 0) {
+      return jobProductIds.includes(p.id);
+    }
+    return p.category === "Bawahan" ? selectedBottom === p.id : selectedTop === p.id;
+  }
+
   async function dress() {
-    if (!selected || busy) return;
+    if ((!selectedTop && !selectedBottom) || busy) return;
     setBusy(true);
     setError(null);
     try {
       await api("/api/virtual-try-on", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysisId: state.analysis!.id, productId: selected }),
+        body: JSON.stringify({
+          analysisId: state.analysis!.id,
+          productId: [selectedTop, selectedBottom].filter(Boolean).join(","),
+          topProductId: selectedTop ?? undefined,
+          bottomProductId: selectedBottom ?? undefined,
+        }),
       });
       onState(await api<FlowState>("/api/session"));
     } catch (e) {
@@ -92,7 +163,7 @@ export function TryOnStep({
         title={
           completed ? (
             <>
-              Ini kamu dengan <em className="text-accent">{chosen?.name ?? "pilihanmu"}</em>.
+              Ini kamu dengan <em className="text-accent">{chosenNames || "pilihanmu"}</em>.
             </>
           ) : (
             <>
@@ -103,7 +174,7 @@ export function TryOnStep({
       >
         {completed
           ? "Bandingkan sebelum dan sesudah. Hasil lengkap personal color dan body shape ada di laporanmu."
-          : "Ketuk satu pakaian untuk memilihnya. Paketmu berlaku untuk satu try-on, jadi pilih yang paling ingin kamu lihat."}
+          : "Pilih 1 atasan dan 1 bawahan (atau salah satunya saja). Virtual try-on akan langsung memakaikan pilihanmu ke fotomu."}
       </Heading>
 
       {job?.status === "failed" && (
@@ -126,7 +197,7 @@ export function TryOnStep({
               >
                 <ArchFrame
                   src={stageSrc}
-                  alt={stageSrc === readyResult ? `Kamu memakai ${chosen?.name}` : "Foto seluruh badanmu"}
+                  alt={stageSrc === readyResult ? `Kamu memakai ${chosenNames || "pakaian pilihanmu"}` : "Foto seluruh badanmu"}
                   className="aspect-[3/4]"
                   scanning={working || busy || preparingResult}
                 />
@@ -135,23 +206,27 @@ export function TryOnStep({
 
             {(working || busy || preparingResult) && (
               <span className="absolute inset-x-0 bottom-5 mx-auto w-fit rounded-full bg-paper/95 px-4 py-2 text-xs font-medium text-ink shadow">
-                {preparingResult ? "Menyiapkan hasil…" : `Memakaikan ${chosen?.name ?? "pakaian"}…`}
+                {preparingResult ? "Menyiapkan hasil…" : `Memakaikan ${chosenNames || "pakaian"}…`}
               </span>
             )}
 
-            {chosen && !locked && !busy && (
+            {chosenItems.length > 0 && !locked && !busy && (
               <motion.div
-                key={chosen.id}
+                key={chosenItems.map((c) => c.id).join("-")}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="absolute bottom-4 left-4 flex items-center gap-2.5 rounded-2xl bg-paper/95 p-2 pr-4 shadow-lg"
               >
-                <span className="relative h-12 w-10 overflow-hidden rounded-xl bg-cream">
-                  <Image src={chosen.image} alt="" fill sizes="40px" className="object-cover" unoptimized={chosen.image.startsWith("http")} />
-                </span>
+                <div className="flex -space-x-2">
+                  {chosenItems.map((c) => (
+                    <span key={c.id} className="relative h-12 w-10 overflow-hidden rounded-xl bg-cream ring-2 ring-paper">
+                      <Image src={c.image} alt="" fill sizes="40px" className="object-cover" unoptimized={c.image.startsWith("http")} />
+                    </span>
+                  ))}
+                </div>
                 <span className="text-xs">
-                  <span className="block text-muted">Dipilih</span>
-                  <span className="font-medium text-ink">{chosen.name}</span>
+                  <span className="block text-muted">Dipilih ({chosenItems.length})</span>
+                  <span className="font-medium text-ink max-w-[130px] truncate block">{chosenNames}</span>
                 </span>
               </motion.div>
             )}
@@ -174,8 +249,16 @@ export function TryOnStep({
           {!completed && (
             <div className="mt-6">
               <TagButton
-                label="Pakaikan ke fotoku"
-                ready={!!selected}
+                label={
+                  selectedTop && selectedBottom
+                    ? "Pakaikan 1 Atasan & 1 Bawahan ke fotoku"
+                    : selectedTop
+                    ? `Pakaikan ${chosenTop?.name ?? "Atasan"} ke fotoku`
+                    : selectedBottom
+                    ? `Pakaikan ${chosenBottom?.name ?? "Bawahan"} ke fotoku`
+                    : "Pilih 1 atasan dan/atau 1 bawahan"
+                }
+                ready={hasSelection}
                 busy={busy || working}
                 busyLabel="Sedang memakaikan…"
                 onClick={dress}
@@ -190,6 +273,31 @@ export function TryOnStep({
         <div>
           {completed && <ReportCard state={state} />}
 
+          {/* Quota Badges */}
+          <div className="mb-6 flex flex-wrap items-center gap-2.5 rounded-2xl bg-cream/70 p-3 ring-1 ring-line">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">Kuota Try-On:</span>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
+                canTryTop
+                  ? "bg-accent/15 text-accent-deep ring-1 ring-accent/30"
+                  : "bg-paper text-muted ring-1 ring-line line-through"
+              }`}
+            >
+              <Shirt size={12} />
+              Kuota Atasan: {canTryTop ? "1/1 Tersedia" : "0/1 Terpakai"}
+            </span>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
+                canTryBottom
+                  ? "bg-accent/15 text-accent-deep ring-1 ring-accent/30"
+                  : "bg-paper text-muted ring-1 ring-line line-through"
+              }`}
+            >
+              <Sparkles size={12} />
+              Kuota Bawahan: {canTryBottom ? "1/1 Tersedia" : "0/1 Terpakai"}
+            </span>
+          </div>
+
           {!products && !error && (
             <div className="grid grid-cols-3 gap-3">
               {Array.from({ length: 6 }, (_, i) => (
@@ -198,45 +306,88 @@ export function TryOnStep({
             </div>
           )}
 
-          {groups.map(([category, items]) => (
-            <section key={category} className={completed ? "mt-8" : ""}>
-              <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-                <Shirt size={13} /> {category}
-              </h2>
-              <div className="grid grid-cols-3 gap-3">
-                {items.map((p) => {
-                  const active = chosen?.id === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelected(p.id)}
-                      disabled={locked || busy}
-                      aria-pressed={active}
-                      className={`group text-left transition ${locked && !active ? "opacity-40" : ""}`}
-                    >
-                      <span
-                        className={`relative block aspect-[3/4] overflow-hidden rounded-[1.25rem] bg-cream ring-1 transition ${
-                          active ? "ring-2 ring-accent-deep" : "ring-line group-hover:ring-accent"
-                        }`}
-                      >
-                        <Image src={p.image} alt={p.name} fill loading="eager" sizes="(min-width: 768px) 15vw, 30vw" className="object-cover transition-transform duration-500 group-hover:scale-105" unoptimized={p.image.startsWith("http")} />
-                        {active && (
-                          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-deep text-paper">
-                            <Check size={12} />
-                          </span>
-                        )}
+          {/* Visual gap between categories: space-y-8 */}
+          <div className="space-y-8">
+            {groups.map(([category, items]) => {
+              const isAtasan = category === "Atasan";
+              const isBawahan = category === "Bawahan";
+              const quotaLabel = isAtasan
+                ? `Kuota: ${canTryTop ? "1/1" : "0/1"}`
+                : isBawahan
+                ? `Kuota: ${canTryBottom ? "1/1" : "0/1"}`
+                : null;
+
+              return (
+                <section key={category}>
+                  <h2 className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                    <span className="flex items-center gap-2">
+                      {isBawahan ? <Sparkles size={13} /> : <Shirt size={13} />} {category}
+                    </span>
+                    {quotaLabel && (
+                      <span className="font-mono text-[11px] normal-case tracking-normal text-muted/80">
+                        {quotaLabel}
                       </span>
-                      <span className="mt-1.5 block truncate text-sm font-medium text-ink">{p.name}</span>
-                      <span className="block truncate text-[11px] text-muted">
-                        {p.brand && p.brand !== "FLICKS" ? `${p.brand} · ${p.subcategory}` : p.subcategory}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+                    )}
+                  </h2>
+                  <div className="grid grid-cols-3 gap-3">
+                    {items.map((p) => {
+                      const active = isProductActive(p);
+                      return (
+                        <div
+                          key={p.id}
+                          className={`group flex flex-col text-left transition ${locked && !active ? "opacity-40" : ""}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleSelect(p)}
+                            disabled={locked || busy}
+                            aria-pressed={active}
+                            className="w-full text-left focus:outline-none"
+                          >
+                            <span
+                              className={`relative block aspect-[3/4] overflow-hidden rounded-[1.25rem] bg-cream ring-1 transition ${
+                                active ? "ring-2 ring-accent-deep" : "ring-line group-hover:ring-accent"
+                              }`}
+                            >
+                              <Image
+                                src={p.image}
+                                alt={p.name}
+                                fill
+                                loading="eager"
+                                sizes="(min-width: 768px) 15vw, 30vw"
+                                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                unoptimized={p.image.startsWith("http")}
+                              />
+                              {active && (
+                                <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-deep text-paper shadow-sm">
+                                  <Check size={12} />
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-1.5 block truncate text-sm font-medium text-ink">{p.name}</span>
+                            <span className="block truncate text-[11px] text-muted">
+                              {p.brand && p.brand !== "FLICKS" ? `${p.brand} · ${p.subcategory}` : p.subcategory}
+                            </span>
+                          </button>
+                          {p.sourceUrl && (
+                            <a
+                              href={p.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:text-accent-deep underline decoration-accent/40 underline-offset-2 transition-colors w-fit"
+                            >
+                              <span className="truncate max-w-[90px]">Beli di {p.brand && p.brand !== "FLICKS" ? p.brand : "Toko"}</span>
+                              <ExternalLink size={10} className="shrink-0" />
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

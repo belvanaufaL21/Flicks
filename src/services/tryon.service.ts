@@ -11,7 +11,13 @@ import { FlowError, analysisForSession } from "./analysis.service";
 // total; after that the token stays reserved for manual recovery (refund policy TBD).
 export const MAX_TRYON_ATTEMPTS = 2;
 
-export async function startTryon(args: { sessionHash: string; analysisId: string; productId: string }) {
+export async function startTryon(args: {
+  sessionHash: string;
+  analysisId: string;
+  productId?: string;
+  topProductId?: string;
+  bottomProductId?: string;
+}) {
   if (!config.paidFeaturesEnabled) throw new FlowError("Layanan virtual try-on sedang dihentikan sementara.", 503);
   if (config.fashn.mode === "missing") {
     throw new FlowError("Layanan virtual try-on belum tersedia. Token kamu tidak terpakai.", 503);
@@ -24,8 +30,27 @@ export async function startTryon(args: { sessionHash: string; analysisId: string
     throw new FlowError("Laporan ini sudah kedaluwarsa.", 410);
   }
 
-  const product = await store.product(args.productId);
-  if (!product?.isActive) throw new FlowError("Produk tidak tersedia.", 404); // QA-13
+  const rawIds = [args.topProductId, args.bottomProductId].filter(Boolean) as string[];
+  const productIds = rawIds.length > 0 ? rawIds : (args.productId || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (productIds.length === 0) throw new FlowError("Pilih minimal satu produk.", 400);
+
+  const products = await Promise.all(productIds.map((id) => store.product(id)));
+  for (const p of products) {
+    if (!p?.isActive) throw new FlowError("Produk tidak tersedia.", 404); // QA-13
+  }
+  const validProducts = products as NonNullable<(typeof products)[0]>[];
+
+  // If two products are selected, process top first then bottom for natural garment layering
+  const orderedProducts = [...validProducts].sort((a, b) => {
+    const isTopA = a.category === "Atasan" || a.labels.fashnCategory === "tops";
+    const isTopB = b.category === "Atasan" || b.labels.fashnCategory === "tops";
+    if (isTopA && !isTopB) return -1;
+    if (!isTopA && isTopB) return 1;
+    return 0;
+  });
+
+  const firstProduct = orderedProducts[0];
+  const combinedProductId = orderedProducts.map((p) => p.id).join(",");
 
   const token = await store.token(analysis.tokenId);
   if (token?.status !== "reserved") throw new FlowError("Token tidak dalam status yang benar.", 409);
@@ -35,7 +60,7 @@ export async function startTryon(args: { sessionHash: string; analysisId: string
     {
       id: newId("vto"),
       analysisId: analysis.id,
-      productId: product.id,
+      productId: combinedProductId,
       idempotencyKey: `vto:${analysis.id}`,
       provider: config.fashn.mode === "mock" ? "mock" : "fashn",
       providerJobId: null,
@@ -58,20 +83,12 @@ export async function startTryon(args: { sessionHash: string; analysisId: string
   if (!person) throw new FlowError("Foto sudah dihapus sesuai kebijakan retensi.", 410);
 
   try {
-    let garmentBytes: Uint8Array;
-    if (product.imagePath.startsWith("http://") || product.imagePath.startsWith("https://")) {
-      const res = await fetch(product.imagePath);
-      if (!res.ok) throw new Error(`Gagal mengunduh gambar produk: status ${res.status}`);
-      garmentBytes = new Uint8Array(await res.arrayBuffer());
-    } else {
-      const fileBuffer = await readFile(path.join(process.cwd(), "public", product.imagePath));
-      garmentBytes = new Uint8Array(fileBuffer);
-    }
+    const garmentBytes = await loadGarmentBytes(firstProduct.imagePath);
 
     const providerJobId = await submitTryon({
       person,
-      garment: { bytes: garmentBytes, mime: mimeFromPath(product.imagePath) },
-      category: product.labels.fashnCategory,
+      garment: { bytes: garmentBytes, mime: mimeFromPath(firstProduct.imagePath) },
+      category: firstProduct.labels.fashnCategory,
     });
     return (await store.updateTryonJob(job.id, { providerJobId, status: "processing" }))!;
   } catch (err) {
@@ -97,7 +114,9 @@ export function refreshTryon(job: TryonJob): Promise<TryonJob> {
   const work = (async () => {
     const store = getStore();
     try {
-      const status = await getTryonStatus(job.providerJobId!);
+      const isStep2 = job.providerJobId!.startsWith("step2:");
+      const actualJobId = isStep2 ? job.providerJobId!.slice("step2:".length) : job.providerJobId!;
+      const status = await getTryonStatus(actualJobId);
       if (status.state === "processing") return job;
       if (status.state === "failed") {
         await logUsage(job, false, status.error);
@@ -110,6 +129,25 @@ export function refreshTryon(job: TryonJob): Promise<TryonJob> {
           ? await downloadResult(status.output.url)
           : // Demo mode: no image is generated. Show the uploaded photo, labelled as a demo.
             (await store.photo(analysis.bodyPhotoId))!;
+
+      const productIds = job.productId.split(",").map((s) => s.trim()).filter(Boolean);
+      // Dual-quota chaining: if two products were selected and step 1 just finished, chain into step 2
+      if (productIds.length > 1 && !isStep2) {
+        try {
+          const secondProduct = await store.product(productIds[1]);
+          if (secondProduct?.isActive) {
+            const secondGarmentBytes = await loadGarmentBytes(secondProduct.imagePath);
+            const secondJobId = await submitTryon({
+              person: result,
+              garment: { bytes: secondGarmentBytes, mime: mimeFromPath(secondProduct.imagePath) },
+              category: secondProduct.labels.fashnCategory,
+            });
+            return (await store.updateTryonJob(job.id, { providerJobId: `step2:${secondJobId}` }))!;
+          }
+        } catch (chainErr) {
+          console.error(`[tryon ${job.id}] step2 chaining submit failed, falling back to step 1`, chainErr);
+        }
+      }
 
       const photo = await store.savePhoto({
         id: newId("pho"),
@@ -138,6 +176,16 @@ export function refreshTryon(job: TryonJob): Promise<TryonJob> {
   })();
   inFlight.set(job.id, work);
   return work;
+}
+
+async function loadGarmentBytes(imagePath: string): Promise<Uint8Array> {
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    const res = await fetch(imagePath);
+    if (!res.ok) throw new Error(`Gagal mengunduh gambar produk: status ${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  const fileBuffer = await readFile(path.join(process.cwd(), "public", imagePath));
+  return new Uint8Array(fileBuffer);
 }
 
 function logUsage(job: TryonJob, ok: boolean, detail: string | null) {
