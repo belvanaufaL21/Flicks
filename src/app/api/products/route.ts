@@ -14,7 +14,6 @@ export async function GET() {
       subcategory: p.subcategory,
       image: p.imagePath,
       silhouette: p.labels.silhouette,
-      sourceUrl: p.sourceUrl ?? null,
     })),
   );
 }

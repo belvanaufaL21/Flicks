@@ -90,8 +90,6 @@ function ReadyReport({ r }: { r: Ready }) {
   const bs = r.bodyShape;
   const tryonBusy = r.tryon && (r.tryon.status === "queued" || r.tryon.status === "processing");
 
-  const activeDemoNotes = r.demoNotes.filter((n) => !n.includes("contoh tetap"));
-
   return (
     <div className="mx-auto max-w-5xl px-4 pb-24 pt-10 sm:px-6">
       {tryonBusy && <AutoRefresh />}
@@ -109,11 +107,11 @@ function ReadyReport({ r }: { r: Ready }) {
         </div>
       </div>
 
-      {activeDemoNotes.length > 0 && (
+      {r.demoNotes.length > 0 && (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent-soft/60 px-4 py-3 text-sm text-accent-deep">
           <FlaskConical size={18} className="mt-0.5 shrink-0" />
           <p>
-            <span className="font-semibold">Mode demo:</span> {activeDemoNotes.join("; ")}.
+            <span className="font-semibold">Mode demo:</span> {r.demoNotes.join("; ")}.
           </p>
         </div>
       )}

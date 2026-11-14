@@ -18,52 +18,31 @@ const cookieOptions = {
 };
 
 export async function readSessionHash() {
-  try {
-    const value = (await cookies()).get(SESSION_COOKIE)?.value;
-    return value ? sha256(value) : null;
-  } catch {
-    return null;
-  }
+  const value = (await cookies()).get(SESSION_COOKIE)?.value;
+  return value ? sha256(value) : null;
 }
 
 /** Route handlers only: creates the session cookie when it does not exist yet. */
 export async function ensureSessionHash() {
-  try {
-    const jar = await cookies();
-    let value = jar.get(SESSION_COOKIE)?.value;
-    if (!value) {
-      value = newSecret();
-      jar.set(SESSION_COOKIE, value, cookieOptions);
-    }
-    return sha256(value);
-  } catch {
-    // ponytail: fallback in unit test/script environments where Next async storage is absent
-    return sha256("dev-session");
+  const jar = await cookies();
+  let value = jar.get(SESSION_COOKIE)?.value;
+  if (!value) {
+    value = newSecret();
+    jar.set(SESSION_COOKIE, value, cookieOptions);
   }
+  return sha256(value);
 }
 
 export async function rememberReportSecret(secret: string) {
-  try {
-    (await cookies()).set(REPORT_COOKIE, secret, cookieOptions);
-  } catch {
-    // Ignore when called outside request scope
-  }
+  (await cookies()).set(REPORT_COOKIE, secret, cookieOptions);
 }
 
 export async function readReportSecret() {
-  try {
-    return (await cookies()).get(REPORT_COOKIE)?.value ?? null;
-  } catch {
-    return null;
-  }
+  return (await cookies()).get(REPORT_COOKIE)?.value ?? null;
 }
 
 export async function clearFlowCookies() {
-  try {
-    const jar = await cookies();
-    jar.delete(SESSION_COOKIE);
-    jar.delete(REPORT_COOKIE);
-  } catch {
-    // Ignore when called outside request scope
-  }
+  const jar = await cookies();
+  jar.delete(SESSION_COOKIE);
+  jar.delete(REPORT_COOKIE);
 }

@@ -42,7 +42,7 @@ export const config = {
 
   supabase: {
     url: env.NEXT_PUBLIC_SUPABASE_URL,
-    secretKey: env.SUPABASE_SECRET_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY,
+    secretKey: env.SUPABASE_SECRET_KEY,
   },
 
   priceIdr: 19_000,
@@ -53,9 +53,7 @@ export const config = {
   // photos stay with the processors named in the privacy notice.
   openrouter: {
     get mode() {
-      const mode = providerMode(env.OPENROUTER_API_KEY?.trim());
-      // ponytail: fallback to mock in demo/trial mode so flow is testable without paid API key
-      return mode === "missing" && env.FREE_CHECKOUT === "true" ? "mock" : mode;
+      return providerMode(env.OPENROUTER_API_KEY?.trim());
     },
     apiKey: env.OPENROUTER_API_KEY?.trim(),
     baseUrl: "https://openrouter.ai/api/v1",
@@ -97,8 +95,7 @@ export const config = {
 
   // Signs short-lived URLs for private photos. A per-process fallback is fine in
   // development; production must set a fixed value so URLs survive restarts.
-  // ponytail: fallback to CRON_SECRET if MEDIA_SIGNING_SECRET is omitted
-  mediaSigningSecret: env.MEDIA_SIGNING_SECRET ?? env.CRON_SECRET ?? (isProduction ? undefined : devFallbackSecret()),
+  mediaSigningSecret: env.MEDIA_SIGNING_SECRET ?? (isProduction ? undefined : devFallbackSecret()),
 
   // Analysis cost comes from OpenRouter's reported charge per call. FASHN still uses
   // the PRD §I planning estimate until real invoices are in.
@@ -123,8 +120,8 @@ export function missingSettings(): string[] {
     NEXT_PUBLIC_SUPABASE_URL: config.supabase.url,
     SUPABASE_SECRET_KEY: config.supabase.secretKey,
     MEDIA_SIGNING_SECRET: config.mediaSigningSecret,
-    OPENROUTER_API_KEY: config.freeCheckout || config.openrouter.mode !== "missing",
-    FASHN_API_KEY: config.freeCheckout || config.fashn.mode !== "missing",
+    OPENROUTER_API_KEY: config.openrouter.mode !== "missing",
+    FASHN_API_KEY: config.fashn.mode !== "missing",
     // Not needed while trial mode hands out tokens without payment.
     MIDTRANS_SERVER_KEY: config.freeCheckout || config.midtrans.mode !== "missing",
   };
@@ -136,7 +133,7 @@ export function missingSettings(): string[] {
 export function demoNotes(): string[] {
   const notes: string[] = [];
   if (config.midtrans.mode === "mock" && !config.freeCheckout) notes.push("pembayaran disimulasikan, tidak ada uang yang ditarik");
-  // ponytail: "hasil analisis berupa contoh tetap, bukan dari fotomu" removed per user request for business demo
+  if (config.openrouter.mode === "mock") notes.push("hasil analisis berupa contoh tetap, bukan dari fotomu");
   if (config.fashn.mode === "mock") notes.push("virtual try-on menampilkan foto aslimu tanpa pakaian baru");
   return notes;
 }
